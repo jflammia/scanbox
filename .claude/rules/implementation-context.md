@@ -29,10 +29,18 @@ ScanBox was designed in a brainstorming session on 2026-03-28 between the projec
 - PaperlessNGX is accessed via **REST API** (`POST /api/documents/post_document/`), not by dropping files in a consumption folder. This was a late design pivot — earlier versions used filesystem consumption. The API approach is cleaner (no shared filesystem mount needed, upload confirmation, direct metadata setting).
 - The `created` field in the PaperlessNGX upload is critical — without it, all documents show as "today" instead of their actual date of service.
 
+### Architecture Decisions
+
+- **API-first.** The REST API is the primary interface. The web UI is built on top of it, not alongside it. This was a deliberate pivot to make ScanBox usable by AI agents, scripts, and external tools — not just humans in a browser.
+- **MCP server.** ScanBox exposes an MCP (Model Context Protocol) server so AI agents like Claude can interact natively — scanning, reviewing, correcting, and saving through tool calls. Enable with `MCP_ENABLED=true`.
+- **Webhooks for events.** External systems can register for `scan.completed`, `processing.completed`, and `save.completed` events. This enables integration with any workflow automation.
+- **Optional API auth.** `SCANBOX_API_KEY` adds bearer token auth. Off by default for local use. This keeps the local experience frictionless while allowing secured remote access.
+- **OpenAPI auto-generated.** FastAPI generates the OpenAPI spec at `/api/openapi.json` and interactive docs at `/api/docs`. No manual spec maintenance needed.
+
 ### UX Decisions
 
 - **No modes, no toggles.** Automation always runs. The user corrects after. This was a deliberate simplification — earlier versions had a "Manual-First Mode" toggle that was cut.
-- **One "Save" button.** Writes to all three destinations (archive, medical records, PaperlessNGX) at once. Earlier versions had separate export buttons — cut for simplicity.
+- **One "Save" button.** Writes to all destinations (archive, medical records, PaperlessNGX) at once. Earlier versions had separate export buttons — cut for simplicity.
 - **Card layout, not data table** for results. Cards with PDF thumbnails are more approachable for non-technical users.
 - **Wizard pattern** for scanning — numbered steps with illustrations. Not a dashboard.
 - **Error messages must be plain English.** Never say "eSCL protocol error." Say "Can't reach the scanner. Is it turned on?"
@@ -97,4 +105,4 @@ These must be installed in the Docker image AND on the development machine:
 | Tesseract | `tesseract-ocr tesseract-ocr-eng` | `tesseract` | OCR engine |
 | Ghostscript | `ghostscript` | `ghostscript` | Required by ocrmypdf >= 17 |
 | Poppler | `poppler-utils` | `poppler` | PDF-to-image rendering |
-| libgl1 | `libgl1-mesa-glx` | (included in macOS) | Pillow image processing |
+| libgl1 | `libgl1` | (included in macOS) | Pillow image processing |

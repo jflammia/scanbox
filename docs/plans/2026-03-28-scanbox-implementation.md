@@ -1,6 +1,6 @@
 # ScanBox Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Implement this plan task-by-task using TDD. Steps use checkbox (`- [ ]`) syntax for tracking. Each task ends with a commit.
 
 **Goal:** Build a self-contained Docker app that controls an HP scanner via eSCL, processes scans through an automated pipeline (interleave, blank removal, OCR, AI split), and outputs organized medical records.
 
@@ -19,8 +19,8 @@ This project is too large for a single implementation pass. It's broken into thr
 | Phase | What It Delivers | Testable Without |
 |-------|-----------------|-----------------|
 | **Phase 1: Pipeline Core** | All processing logic (interleave, blank detect, OCR, AI split, name, output) + test fixtures + unit/integration tests | Web UI, scanner, API |
-| **Phase 2: API + Scanner + Web UI** | FastAPI API, eSCL scanner client, web UI for scanning + review + save, SSE progress, session state machine | PaperlessNGX, setup wizard, practice run |
-| **Phase 3: Polish & Integrations** | First-run setup wizard, practice run, PaperlessNGX API integration, document boundary editor, metadata editing | Nothing — this is the complete app |
+| **Phase 2: API + Scanner + Web UI** | FastAPI API (primary interface), eSCL scanner client, web UI for scanning + review + save, SSE progress, session state machine | MCP, webhooks, setup wizard, practice run |
+| **Phase 3: Polish + AI Integration** | Setup wizard, practice run, boundary editor, webhooks, MCP server, OpenAPI docs, Docker verification | Nothing — this is the complete app |
 
 **Each phase has its own commit checkpoints.** Phase 1 can be reviewed and tested before Phase 2 begins.
 
@@ -70,6 +70,16 @@ Every file that will be created or modified, grouped by responsibility:
 | `scanbox/api/setup.py` | First-run setup and practice run endpoints |
 | `scanbox/api/sse.py` | SSE event bus for progress communication |
 | `scanbox/api/paperless.py` | PaperlessNGX API client (upload, tags, types) |
+| `scanbox/api/webhooks.py` | Webhook registration and event delivery |
+| `scanbox/api/health.py` | Health check and version info |
+
+### MCP Server
+
+| File | Responsibility |
+|------|---------------|
+| `scanbox/mcp/__init__.py` | MCP package init |
+| `scanbox/mcp/server.py` | MCP server setup (tools, resources, prompts) |
+| `scanbox/mcp/tools.py` | Tool implementations wrapping API logic |
 
 ### Frontend
 
@@ -266,7 +276,7 @@ DOCUMENT_TYPES = [
 
 - [ ] **Step 3: Verify imports work**
 
-Run: `cd /Users/justin/Code/scanbox && python -c "from scanbox.config import config; from scanbox.models import BatchState, SplitDocument; print('OK')"`
+Run: `python -c "from scanbox.config import config; from scanbox.models import BatchState, SplitDocument; print('OK')"`
 Expected: `OK`
 
 - [ ] **Step 4: Commit**
@@ -657,7 +667,7 @@ def sample_splits_json() -> list[dict]:
 
 - [ ] **Step 4: Generate fixtures**
 
-Run: `cd /Users/justin/Code/scanbox && python -m tests.generate_fixtures`
+Run: `python -m tests.generate_fixtures`
 Expected: `Generated fixtures in tests/fixtures`
 
 - [ ] **Step 5: Verify fixture files exist**
@@ -770,7 +780,7 @@ class TestInterleave:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_interleave.py -v`
+Run: `python -m pytest tests/unit/test_interleave.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'scanbox.pipeline.interleave'`
 
 - [ ] **Step 3: Write minimal implementation**
@@ -843,7 +853,7 @@ def interleave_pages(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_interleave.py -v`
+Run: `python -m pytest tests/unit/test_interleave.py -v`
 Expected: All 6 tests PASS
 
 - [ ] **Step 5: Commit**
@@ -934,7 +944,7 @@ class TestRemoveBlankPages:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_blank_detect.py -v`
+Run: `python -m pytest tests/unit/test_blank_detect.py -v`
 Expected: FAIL — `ModuleNotFoundError`
 
 - [ ] **Step 3: Write implementation**
@@ -1014,7 +1024,7 @@ def remove_blank_pages(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_blank_detect.py -v`
+Run: `python -m pytest tests/unit/test_blank_detect.py -v`
 Expected: All tests PASS
 
 - [ ] **Step 5: Commit**
@@ -1112,7 +1122,7 @@ class TestGenerateFilename:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_namer.py -v`
+Run: `python -m pytest tests/unit/test_namer.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Write implementation**
@@ -1175,7 +1185,7 @@ def generate_filename(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_namer.py -v`
+Run: `python -m pytest tests/unit/test_namer.py -v`
 Expected: All tests PASS
 
 - [ ] **Step 5: Commit**
@@ -1292,7 +1302,7 @@ class TestBuildPrompt:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_splitter.py -v`
+Run: `python -m pytest tests/unit/test_splitter.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Write implementation**
@@ -1440,7 +1450,7 @@ async def split_documents(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_splitter.py -v`
+Run: `python -m pytest tests/unit/test_splitter.py -v`
 Expected: All tests PASS
 
 - [ ] **Step 5: Commit**
@@ -1512,7 +1522,7 @@ class TestRunOcr:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_ocr.py -v`
+Run: `python -m pytest tests/unit/test_ocr.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Write implementation**
@@ -1585,7 +1595,7 @@ def run_ocr(
 
 - [ ] **Step 4: Run tests**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_ocr.py -v`
+Run: `python -m pytest tests/unit/test_ocr.py -v`
 Expected: PASS (requires tesseract-ocr installed: `brew install tesseract`)
 
 - [ ] **Step 5: Commit**
@@ -1695,7 +1705,7 @@ class TestAppendIndexCsv:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_output.py -v`
+Run: `python -m pytest tests/unit/test_output.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Write implementation**
@@ -1809,7 +1819,7 @@ def append_index_csv(
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_output.py -v`
+Run: `python -m pytest tests/unit/test_output.py -v`
 Expected: All tests PASS
 
 - [ ] **Step 5: Commit**
@@ -2058,7 +2068,7 @@ async def run_pipeline(
 
 - [ ] **Step 3: Run integration tests**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/integration/test_pipeline.py -v`
+Run: `python -m pytest tests/integration/test_pipeline.py -v`
 Expected: 1 skipped (LLM mock needed), 1 pass (state file test)
 
 - [ ] **Step 4: Commit**
@@ -2120,7 +2130,7 @@ class TestBuildScanSettings:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_escl.py -v`
+Run: `python -m pytest tests/unit/test_escl.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Write scanner models**
@@ -2307,7 +2317,7 @@ class ESCLClient:
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `cd /Users/justin/Code/scanbox && python -m pytest tests/unit/test_escl.py -v`
+Run: `python -m pytest tests/unit/test_escl.py -v`
 Expected: All tests PASS
 
 - [ ] **Step 6: Commit**
@@ -2333,7 +2343,6 @@ At this point, the entire processing pipeline is implemented and unit tested:
 
 **Run all unit tests:**
 ```bash
-cd /Users/justin/Code/scanbox
 ruff format scanbox/ tests/
 ruff check scanbox/ tests/
 python -m pytest tests/unit/ -v
@@ -2446,14 +2455,53 @@ Implement the 4-step in-app practice run described in `docs/design.md` "In-App G
 
 Implement the thumbnail strip editor for manual split correction. `GET /api/batches/{id}/thumbnails` returns page thumbnail images. `POST /api/batches/{id}/splits` accepts user-defined boundary positions. Re-runs naming stage from the new splits.
 
-### Task 21: Docker Build Verification
+### Task 21: Webhooks
+
+Implement webhook registration and delivery for external automation.
+
+**Files:**
+- Create: `scanbox/api/webhooks.py`
+
+- [ ] `POST /api/webhooks` — register a webhook URL with event filter
+- [ ] `GET /api/webhooks` — list registered webhooks
+- [ ] `DELETE /api/webhooks/{id}` — remove a webhook
+- [ ] Webhook delivery: async HTTP POST with JSON payload and HMAC-SHA256 signature
+- [ ] Events: `scan.completed`, `processing.completed`, `processing.stage_completed`, `save.completed`, `review.needed`
+- [ ] Retry with exponential backoff on delivery failure (3 attempts)
+- [ ] Environment variable shortcut: `WEBHOOK_URL` + `WEBHOOK_SECRET` registers a default webhook for all events
+
+### Task 22: MCP Server
+
+Implement the Model Context Protocol server for AI agent integration. See `docs/mcp-server.md` for the full specification.
+
+**Files:**
+- Create: `scanbox/mcp/__init__.py`
+- Create: `scanbox/mcp/server.py`
+- Create: `scanbox/mcp/tools.py`
+
+- [ ] MCP server setup using the `mcp` Python SDK
+- [ ] Tools: `scanbox_scan_fronts`, `scanbox_scan_backs`, `scanbox_skip_backs`, `scanbox_get_scanner_status`, `scanbox_create_session`, `scanbox_list_sessions`, `scanbox_get_batch_status`, `scanbox_list_documents`, `scanbox_get_document`, `scanbox_update_document`, `scanbox_adjust_boundaries`, `scanbox_save_batch`, `scanbox_reprocess_batch`, `scanbox_manage_persons`, `scanbox_health_check`
+- [ ] Resources: `scanbox://status`, `scanbox://sessions`, `scanbox://batches/{id}`, `scanbox://documents/{id}`, `scanbox://documents/{id}/text`
+- [ ] Prompts: `review_batch`, `classify_document`
+- [ ] Enable via `MCP_ENABLED=true` environment variable
+- [ ] Transport: stdio (for local use via `docker exec`) and SSE (for remote)
+- [ ] Tools delegate to the same API logic — no duplicate business logic
+
+### Task 23: OpenAPI Documentation
+
+- [ ] Verify FastAPI auto-generates complete OpenAPI spec at `/api/openapi.json`
+- [ ] Add API examples and descriptions to all route docstrings
+- [ ] Interactive docs accessible at `/api/docs` (Swagger UI) and `/api/redoc` (ReDoc)
+- [ ] Add `SCANBOX_API_KEY` bearer token auth (optional, off by default)
+
+### Task 24: Docker Build Verification
 
 Build and test the Docker image locally:
 ```bash
 docker build -t scanbox:test .
 docker compose up
 ```
-Verify all functionality works in containerized mode. Fix any path/permission issues.
+Verify all functionality works in containerized mode. Fix any path/permission issues. Test MCP server via `docker exec -i scanbox python -m scanbox.mcp`.
 
 ---
 
@@ -2462,7 +2510,6 @@ Verify all functionality works in containerized mode. Fix any path/permission is
 Before starting implementation, install dev dependencies:
 
 ```bash
-cd /Users/justin/Code/scanbox
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
