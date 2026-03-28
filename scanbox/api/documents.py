@@ -18,6 +18,7 @@ class UpdateDocumentRequest(BaseModel):
 
 @router.get("/api/batches/{batch_id}/documents")
 async def list_documents(batch_id: str):
+    """List all documents in a batch."""
     db = get_db()
     docs = await db.list_documents(batch_id)
     return {"items": docs}
@@ -25,6 +26,7 @@ async def list_documents(batch_id: str):
 
 @router.get("/api/documents/{document_id}")
 async def get_document(document_id: str):
+    """Get document metadata by ID."""
     db = get_db()
     doc = await db.get_document(document_id)
     if not doc:
@@ -34,6 +36,7 @@ async def get_document(document_id: str):
 
 @router.put("/api/documents/{document_id}")
 async def update_document(document_id: str, req: UpdateDocumentRequest):
+    """Update document metadata (type, date, provider, etc.)."""
     db = get_db()
     doc = await db.get_document(document_id)
     if not doc:

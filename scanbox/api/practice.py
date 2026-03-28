@@ -36,6 +36,7 @@ def _write_practice(data: dict) -> None:
 
 @router.get("/api/practice/status")
 async def practice_status():
+    """Get the current practice run status and step progress."""
     data = _read_practice()
     return {
         "completed": data.get("completed", False),
@@ -47,6 +48,7 @@ async def practice_status():
 
 @router.post("/api/practice/step/{step}/complete")
 async def complete_step(step: int):
+    """Mark a practice run step as complete and advance to the next."""
     data = _read_practice()
     current = data.get("current_step", 1)
 
@@ -77,6 +79,7 @@ async def complete_step(step: int):
 
 @router.post("/api/practice/reset")
 async def reset_practice():
+    """Reset the practice run to step 1."""
     data = {"completed": False, "current_step": 1, "steps_done": []}
     _write_practice(data)
     return {"current_step": 1, "completed": False, "total_steps": TOTAL_STEPS}
