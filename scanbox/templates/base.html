@@ -25,12 +25,15 @@
   </main>
 
   <footer class="max-w-4xl mx-auto px-4 py-3 mt-8 border-t border-border">
-    <div id="scanner-status"
-         hx-get="/scanner/status"
-         hx-trigger="load, every 10s"
-         hx-swap="innerHTML"
-         class="text-sm text-text-muted">
-      Checking scanner...
+    <div class="flex items-center justify-between">
+      <div id="scanner-status"
+           hx-get="/scanner/status"
+           hx-trigger="load, every 10s"
+           hx-swap="innerHTML"
+           class="text-sm text-text-muted">
+        Checking scanner...
+      </div>
+      <div class="text-xs text-text-muted" title="For her — always.">Made with ❤️ and 🧵</div>
     </div>
   </footer>
 
