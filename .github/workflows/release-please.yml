@@ -18,6 +18,7 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release-type: python
@@ -25,7 +26,7 @@ jobs:
   docker-release:
     name: Docker Release
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    if: ${{ needs.release-please.result == 'success' && needs.release-please.outputs.release_created == 'true' }}
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ needs.release-please.outputs.version }}
