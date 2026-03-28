@@ -16,6 +16,7 @@ dependencies = [
     "ocrmypdf>=17",
     "Pillow>=12",
     "pdf2image>=1.17",
+    "pytesseract>=0.3",
     "litellm==1.82.6",
     "python-multipart>=0.0.18",
     "aiosqlite>=0.22",
