@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Practice Run{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/" class="hover:text-text-primary no-underline">&larr; Home</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="max-w-lg mx-auto space-y-8" x-data="{ step: {{ current_step }}, completed: {{ 'true' if completed else 'false' }} }">
+  <div class="text-center">
+    <h1 class="text-3xl font-bold">Practice Run</h1>
+    <p class="text-text-secondary mt-2">Learn how ScanBox works with a few real pages.</p>
+  </div>
+
+  <div class="flex justify-center gap-2 py-2">
+    {% for i in range(1, total_steps + 1) %}
+    <span class="w-3 h-3 rounded-full"
+          :class="step > {{ i }} || completed ? 'bg-status-success' : step === {{ i }} ? 'bg-brand-600' : 'bg-gray-300'"></span>
+    {% endfor %}
+  </div>
+
+  {# Step 1: Scan one page #}
+  <div x-show="step === 1 && !completed" x-transition
+       class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-bold">1</span>
+    </div>
+    <h2 class="text-xl font-semibold text-center">Let's scan one page</h2>
+    <p class="text-text-secondary">
+      Grab one page from your stack &mdash; any page. Put it face-up in the scanner tray.
+      We'll scan it, skip the back sides, and show you the result.
+    </p>
+    <p class="text-sm text-text-muted">
+      This checks: scanner connectivity, OCR, and basic pipeline.
+    </p>
+    <div class="text-center">
+      <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+              hx-post="/api/practice/step/1/complete"
+              hx-target="closest section"
+              @htmx:after-request="step = 2">
+        Done — looks good
+      </button>
+    </div>
+  </div>
+
+  {# Step 2: Double-sided pages #}
+  <div x-show="step === 2 && !completed" x-transition
+       class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-bold">2</span>
+    </div>
+    <h2 class="text-xl font-semibold text-center">Now let's try double-sided pages</h2>
+    <p class="text-text-secondary">
+      Grab 3&ndash;5 pages. Try to include at least one that has printing on both sides.
+      Scan the fronts, flip the stack, then scan the backs.
+    </p>
+    <p class="text-sm text-text-muted">
+      This checks: interleaving, blank page removal, two-pass workflow.
+    </p>
+    <div class="text-center">
+      <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+              hx-post="/api/practice/step/2/complete"
+              hx-target="closest section"
+              @htmx:after-request="step = 3">
+        Done — pages look correct
+      </button>
+    </div>
+  </div>
+
+  {# Step 3: AI document splitting #}
+  <div x-show="step === 3 && !completed" x-transition
+       class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-bold">3</span>
+    </div>
+    <h2 class="text-xl font-semibold text-center">Let's see if the AI can sort your documents</h2>
+    <p class="text-text-secondary">
+      Grab 10&ndash;15 pages that contain a few different documents &mdash; maybe a lab report, a letter, and a radiology report.
+      Don't worry about sorting them.
+    </p>
+    <p class="text-sm text-text-muted">
+      This checks: AI splitting accuracy, metadata extraction, correction workflow.
+    </p>
+    <div class="text-center">
+      <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+              hx-post="/api/practice/step/3/complete"
+              hx-target="closest section"
+              @htmx:after-request="step = 4">
+        Done — documents detected correctly
+      </button>
+    </div>
+  </div>
+
+  {# Step 4: Save and check results #}
+  <div x-show="step === 4 && !completed" x-transition
+       class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-center">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-100 text-brand-700 font-bold">4</span>
+    </div>
+    <h2 class="text-xl font-semibold text-center">Let's save and check the results</h2>
+    <p class="text-text-secondary">
+      Everything look good? Let's save these for real. Your documents will be organized
+      by type in the output folder.
+    </p>
+    <p class="text-sm text-text-muted">
+      This checks: save pipeline, output folder structure, file organization.
+    </p>
+    <div class="text-center">
+      <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+              hx-post="/api/practice/step/4/complete"
+              hx-target="closest section"
+              @htmx:after-request="completed = true">
+        Done — files saved correctly
+      </button>
+    </div>
+  </div>
+
+  {# Completion screen #}
+  <div x-show="completed" x-transition
+       class="bg-surface-raised border border-status-success rounded-lg p-8 space-y-4 text-center">
+    <div class="text-5xl">&#9989;</div>
+    <h2 class="text-xl font-semibold">Practice run complete!</h2>
+    <div class="text-left space-y-2 text-text-secondary max-w-sm mx-auto">
+      <p>&#10003; Scanner connected and scanning</p>
+      <p>&#10003; Double-sided pages handled correctly</p>
+      <p>&#10003; AI document detection working</p>
+      <p>&#10003; Files saving to the right places</p>
+    </div>
+    <p class="text-text-secondary">
+      You're ready to scan your full stack. Start with a batch of ~50 pages
+      and review the results before continuing with the rest.
+    </p>
+    <a href="/"
+       class="inline-block bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors no-underline">
+      Start Scanning
+    </a>
+  </div>
+
+  <p class="text-center text-sm text-text-muted">
+    Step <span x-text="completed ? {{ total_steps }} : step"></span> of {{ total_steps }}
+  </p>
+</section>
+{% endblock %}
