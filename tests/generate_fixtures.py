@@ -7,7 +7,7 @@ but containing no real PHI. These are used by unit and integration tests.
 from pathlib import Path
 
 import pikepdf
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -21,12 +21,13 @@ def create_text_page_pdf(text: str, output_path: Path, dpi: int = 300) -> None:
     img = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(img)
 
-    # Use default font, draw text starting near top-left
+    # Use a large font so text pages have clearly visible ink coverage
+    font = ImageFont.load_default(size=int(dpi * 0.2))  # ~60px at 300 DPI
     y_offset = int(0.5 * dpi)
     x_offset = int(0.75 * dpi)
     for line in text.split("\n"):
-        draw.text((x_offset, y_offset), line, fill="black")
-        y_offset += int(0.18 * dpi)
+        draw.text((x_offset, y_offset), line, fill="black", font=font)
+        y_offset += int(0.22 * dpi)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     img.save(str(output_path), "PDF", resolution=dpi)
