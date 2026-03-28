@@ -202,6 +202,34 @@ async def skip_backs_html(request: Request, batch_id: str):
     return HTMLResponse('<p class="text-status-success font-medium">Backs skipped</p>')
 
 
+@router.get("/scanner/status", response_class=HTMLResponse)
+async def scanner_status():
+    cfg = Config()
+    if not cfg.SCANNER_IP:
+        return HTMLResponse(
+            '<span class="inline-block w-3 h-3 rounded-full bg-gray-300"></span>'
+            " <span>No scanner configured</span>"
+        )
+
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=3.0) as http:
+            resp = await http.get(f"http://{cfg.SCANNER_IP}/eSCL/ScannerStatus")
+            if resp.status_code == 200:
+                return HTMLResponse(
+                    '<span class="inline-block w-3 h-3 rounded-full bg-status-success">'
+                    f"</span> Scanner ready ({cfg.SCANNER_IP})"
+                )
+    except Exception:
+        pass
+
+    return HTMLResponse(
+        '<span class="inline-block w-3 h-3 rounded-full bg-status-error"></span>'
+        f" Can't reach scanner ({cfg.SCANNER_IP})"
+    )
+
+
 @router.get("/settings")
 async def settings(request: Request):
     cfg = Config()

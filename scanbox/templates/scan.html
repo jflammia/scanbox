@@ -30,8 +30,8 @@
       <div id="step1-progress" class="mb-4" aria-live="polite"></div>
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
               hx-post="/api/batches/{{ batch.id }}/scan/fronts"
-              hx-target="#step1-progress"
-              hx-swap="innerHTML">
+              hx-swap="none"
+              @htmx:after-request.camel="step1Done = true; currentStep = 2">
         Scan Front Sides
       </button>
     </div>
@@ -58,8 +58,8 @@
       <div class="flex items-center gap-4">
         <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
                 hx-post="/api/batches/{{ batch.id }}/scan/backs"
-                hx-target="#step2-progress"
-                hx-swap="innerHTML">
+                hx-swap="none"
+                @htmx:after-request.camel="step2Done = true; currentStep = 3">
           Scan Back Sides
         </button>
         <a href="#" class="text-brand-600 hover:text-brand-700 text-base no-underline"
