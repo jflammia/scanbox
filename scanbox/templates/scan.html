@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Scanning{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/" class="hover:text-text-primary no-underline">&larr; Home</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div x-data="{ currentStep: 1, step1Done: false, step2Done: false }" class="space-y-6">
+
+  {# Step 1: Scan Front Sides #}
+  <section class="bg-surface-raised border border-border rounded-lg p-6 transition-opacity"
+           :class="{ 'opacity-50': step1Done }">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold"
+            :class="step1Done ? 'bg-status-success text-white' : 'bg-brand-100 text-brand-700'">
+        <template x-if="step1Done"><span>&#10003;</span></template>
+        <template x-if="!step1Done"><span>1</span></template>
+      </span>
+      <h2 class="text-xl font-semibold">Scan Front Sides</h2>
+    </div>
+
+    <div x-show="!step1Done" x-transition>
+      <p class="text-lg text-text-secondary mb-4">
+        Place your documents face-up in the scanner's top tray. Up to 50 pages.
+      </p>
+      <div id="step1-progress" class="mb-4" aria-live="polite"></div>
+      <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
+              hx-post="/api/batches/{{ batch.id }}/scan/fronts"
+              hx-target="#step1-progress"
+              hx-swap="innerHTML">
+        Scan Front Sides
+      </button>
+    </div>
+  </section>
+
+  {# Step 2: Scan Back Sides #}
+  <section class="bg-surface-raised border border-border rounded-lg p-6 transition-opacity"
+           x-show="currentStep >= 2" x-transition
+           :class="{ 'opacity-50': step2Done }">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold"
+            :class="step2Done ? 'bg-status-success text-white' : 'bg-brand-100 text-brand-700'">
+        <template x-if="step2Done"><span>&#10003;</span></template>
+        <template x-if="!step2Done"><span>2</span></template>
+      </span>
+      <h2 class="text-xl font-semibold">Flip &amp; Scan Back Sides</h2>
+    </div>
+
+    <div x-show="!step2Done" x-transition>
+      <p class="text-lg text-text-secondary mb-4">
+        Take the stack from the output tray, flip it face-down, and put it back in the top tray.
+      </p>
+      <div id="step2-progress" class="mb-4" aria-live="polite"></div>
+      <div class="flex items-center gap-4">
+        <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
+                hx-post="/api/batches/{{ batch.id }}/scan/backs"
+                hx-target="#step2-progress"
+                hx-swap="innerHTML">
+          Scan Back Sides
+        </button>
+        <a href="#" class="text-brand-600 hover:text-brand-700 text-base no-underline"
+           hx-post="/api/batches/{{ batch.id }}/skip-backs"
+           @click="step2Done = true; currentStep = 3">
+          No back sides &mdash; skip this &rarr;
+        </a>
+      </div>
+    </div>
+  </section>
+
+  {# Step 3: Processing #}
+  <section class="bg-surface-raised border border-border rounded-lg p-6"
+           x-show="currentStep >= 3" x-transition>
+    <div class="flex items-center gap-3 mb-4">
+      <span class="flex items-center justify-center w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-sm font-bold">3</span>
+      <h2 class="text-xl font-semibold">Processing</h2>
+    </div>
+    <div id="step3-progress" aria-live="polite">
+      <p class="text-lg text-text-secondary">Processing your documents...</p>
+      <div class="h-3 bg-gray-200 rounded-full overflow-hidden mt-3">
+        <div class="h-full bg-brand-600 rounded-full animate-pulse" style="width: 33%"></div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

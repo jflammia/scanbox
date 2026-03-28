@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ScanBox{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script defer src="/static/js/alpine.min.js"></script>
+  <script src="/static/js/htmx.min.js"></script>
+</head>
+<body class="bg-surface text-text-primary min-h-screen">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-white">Skip to content</a>
+
+  <header class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+    <a href="/" class="text-2xl font-bold text-brand-600 no-underline">ScanBox</a>
+    <nav>
+      <a href="/settings" class="text-text-secondary hover:text-text-primary text-sm no-underline">Settings</a>
+    </nav>
+  </header>
+
+  {% block breadcrumb %}{% endblock %}
+
+  <main id="main" class="max-w-4xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast-container"
+       x-data="{ toasts: [] }"
+       class="fixed bottom-4 right-4 z-50 space-y-2"
+       aria-live="polite">
+    <template x-for="toast in toasts" :key="toast.id">
+      <div x-text="toast.message"
+           x-transition
+           class="px-4 py-3 rounded-md shadow-lg text-white bg-brand-600"
+           @click="toasts = toasts.filter(t => t.id !== toast.id)">
+      </div>
+    </template>
+  </div>
+</body>
+</html>
