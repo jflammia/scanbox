@@ -12,7 +12,8 @@ from scanbox.api.scanning import (
 )
 from scanbox.config import Config
 from scanbox.main import get_db
-from scanbox.pipeline.output import write_archive, write_medical_records
+from scanbox.models import SplitDocument
+from scanbox.pipeline.output import append_index_csv, write_archive, write_medical_records
 
 router = APIRouter(tags=["batches"])
 
@@ -188,9 +189,11 @@ async def save_batch(batch_id: str):
         batch_num=batch["batch_num"],
     )
 
-    # Write each document to medical records
+    # Write each document to medical records + Index.csv
     documents = await db.list_documents(batch_id)
     medical_records = []
+    index_csv_path = cfg.medical_records_dir / person["folder_name"] / "Index.csv"
+
     for doc in documents:
         doc_pdf = docs_dir / doc["filename"]
         if doc_pdf.exists():
@@ -203,10 +206,46 @@ async def save_batch(batch_id: str):
             )
             medical_records.append(str(dest))
 
+            # Append to Index.csv
+            split_doc = SplitDocument(
+                start_page=doc["start_page"],
+                end_page=doc["end_page"],
+                document_type=doc["document_type"],
+                date_of_service=doc.get("date_of_service", "unknown"),
+                facility=doc.get("facility", "unknown"),
+                provider=doc.get("provider", "unknown"),
+                description=doc.get("description", "Document"),
+            )
+            append_index_csv(index_csv_path, doc["filename"], split_doc, scan_date)
+
+    # Upload to PaperlessNGX if configured
+    paperless_ids = []
+    if cfg.PAPERLESS_URL and cfg.PAPERLESS_API_TOKEN:
+        from scanbox.api.paperless import PaperlessClient
+
+        paperless = PaperlessClient(cfg.PAPERLESS_URL, cfg.PAPERLESS_API_TOKEN)
+        for doc in documents:
+            doc_pdf = docs_dir / doc["filename"]
+            if doc_pdf.exists():
+                title = f"{doc['document_type']} — {doc.get('description', 'Document')}"
+                tags = ["medical-records", f"person:{person['slug']}"]
+                success = await paperless.upload_document(
+                    pdf_path=doc_pdf,
+                    title=title,
+                    document_type=doc["document_type"],
+                    correspondent=doc.get("facility"),
+                    tags=tags,
+                    created=doc.get("date_of_service"),
+                )
+                if success:
+                    paperless_ids.append(doc["id"])
+
     await db.update_batch_state(batch_id, "saved")
 
     return {
         "status": "saved",
         "archive_path": str(archive_path),
         "medical_records": medical_records,
+        "paperless_ids": paperless_ids,
+        "index_csv": str(index_csv_path),
     }
