@@ -29,6 +29,7 @@ This file captures the results of a comprehensive research effort on 2026-03-28 
 | Tailwind CSS | 4.2.x | CSS-native config, Rust engine. Use standalone CLI at Docker build time — no Node.js. |
 | Ruff | >= 0.15 | Now with `target-version = "py313"` and `UP` (pyupgrade) + `B` (bugbear) + `SIM` (simplify) rules. |
 | pytest-asyncio | >= 1.3 | Standard async test support. Use `asyncio_mode = "auto"`. |
+| mcp | >= 1.0 | Model Context Protocol SDK for AI agent integration. Exposes ScanBox tools/resources to MCP clients. |
 
 ## Frontend Stack: htmx + Alpine.js + Tailwind CSS
 
@@ -99,21 +100,12 @@ RUN tailwindcss -i static/css/input.css -o static/css/app.css --minify
 
 System deps for the runtime image:
 ```
-tesseract-ocr tesseract-ocr-eng ghostscript poppler-utils libgl1-mesa-glx
+tesseract-ocr tesseract-ocr-eng ghostscript poppler-utils
 ```
 
 Note: `ghostscript` is a new requirement for ocrmypdf >= 17.
 
-## Claude Code Agentic Implementation
-
-### Superpowers Plugin v5.0.6
-
-The Superpowers plugin (installed in this user's Claude Code) provides the structured implementation workflow:
-
-- `subagent-driven-development` — dispatches a fresh subagent per task from the plan
-- `test-driven-development` — enforces TDD (test first, then implement)
-- `verification-before-completion` — evidence before assertions
-- `requesting-code-review` — self-review or cross-review between agents
+## Claude Code Development Workflow
 
 ### Quality Feedback Loops
 
@@ -122,11 +114,10 @@ For maximum autonomy during implementation:
 1. **Pre-commit hooks** (already configured) — ruff check + format before every commit
 2. **Claude Code PreToolUse hooks** (already configured) — lint + format + tests before `git commit`
 3. **CI on push** (already configured) — GitHub Actions lint + test + docker build
-4. **PostToolUse auto-test** (recommended addition) — run relevant tests after every file edit
 
-### Agent Teams (Advanced)
+### Parallel Agent Development
 
-For Phase 2+ where multiple subsystems can be built in parallel, Claude's Agent Teams feature can dispatch 3-5 agents working simultaneously in worktrees with coordination via task lists and mailboxes. This is optional — subagent-driven development works fine for serial execution.
+For Phase 2+ where multiple subsystems can be built in parallel, Claude Code agents can work simultaneously in worktrees with coordination via task lists. This is optional — serial task execution works fine for most tasks.
 
 ## Decisions NOT Changed
 

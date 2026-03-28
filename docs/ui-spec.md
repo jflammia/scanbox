@@ -678,7 +678,7 @@ Rendered server-side during processing (Stage 5). Stored as JPEG files in the ba
 GET /api/documents/{id}/thumbnail → JPEG (300px wide, aspect 3:4)
 ```
 
-Use `pikepdf` + `pdf2image` (or PyMuPDF if license permits for internal use) to render page 1 at 150 DPI, scale to 300px wide, save as JPEG quality 85.
+Use `pdf2image` (poppler) to render page 1 at 150 DPI, scale to 300px wide, save as JPEG quality 85.
 
 Lazy-loaded with `loading="lazy"` and a CSS `aspect-[3/4]` placeholder to prevent layout shift.
 

@@ -19,11 +19,28 @@ A self-contained Docker application with a web UI that:
 4. Names and organizes documents using medical-professional conventions
 5. Archives originals and ingests split documents into PaperlessNGX via API
 
-## Core Design Principle: Human Authority
+## Core Design Principles
 
-**The human is always right. Automation is a suggestion.**
+### Principle 1: API-First
 
-Every automated decision in ScanBox — AI document splitting, blank page detection, metadata extraction, document classification — is a **proposal** that the user can accept, modify, or completely override. The software never assumes it knows better than the person looking at the documents.
+**The REST API is the primary interface. The web UI is one consumer.**
+
+Every capability in ScanBox — scanning, processing, reviewing, saving — is exposed through a documented REST API. The web UI is built on top of this API, not alongside it. This means:
+
+- **AI agents** can drive ScanBox through MCP tools or direct API calls
+- **Scripts and automation** can trigger scans, poll status, and retrieve results
+- **External systems** receive webhook notifications on scan completion, processing done, and save events
+- **The web UI** uses the same API endpoints as any other client
+
+ScanBox also exposes an **MCP server** (Model Context Protocol) so AI agents like Claude can interact with it natively — triggering scans, reviewing documents, correcting metadata, and saving results through tool calls. See `docs/mcp-server.md` for the full specification.
+
+See `docs/api-spec.md` for the complete REST API reference.
+
+### Principle 2: Human Authority
+
+**The human (or their agent) is always right. Automation is a suggestion.**
+
+Every automated decision in ScanBox — AI document splitting, blank page detection, metadata extraction, document classification — is a **proposal** that the user can accept, modify, or completely override. The software never assumes it knows better than the person looking at the documents. This applies equally whether the "user" is a human at the web UI or an AI agent calling the API.
 
 This is not a feature bolted onto an automated pipeline. It is the fundamental architecture:
 
@@ -67,42 +84,52 @@ When a user corrects something:
 ## Architecture
 
 ```
+                    Consumers (any can drive ScanBox)
+           ┌──────────────┬──────────────┬──────────────┐
+           │  Web UI       │  AI Agents   │  Scripts &   │
+           │  (browser)    │  (MCP/API)   │  Automation  │
+           └──────┬───────┴──────┬───────┴──────┬───────┘
+                  │              │              │
+                  ▼              ▼              ▼
 ┌───────────────────────────────────────────────────────────┐
 │                     Docker Container                       │
 │                                                           │
-│  ┌─────────────┐         ┌──────────────────────────┐     │
-│  │  Web UI      │────────▶│  FastAPI Backend          │     │
-│  │  (browser)   │◀────────│                          │     │
-│  └─────────────┘   SSE   │  - Scanner control        │     │
-│                          │  - Session management     │     │
-│                          │  - Processing pipeline    │     │
-│                          └─────┬──────────┬──────────┘     │
-│                                │          │                │
-│  ┌─────────────────────────────┼──────────┼──────────────┐ │
-│  │          Processing Pipeline│          │              │ │
-│  │                             │          │              │ │
-│  │  Interleave → Blank Removal → OCR      │              │ │
-│  │      → AI Split/Classify → Name → Save │              │ │
-│  └─────────────────────────────────────────┼──────────────┘ │
-│                                            │                │
-│  ┌────────────────────┐  ┌────────────────────────────┐    │
-│  │  Internal Storage   │  │  scanbox.db (SQLite)       │    │
-│  │  /app/data          │  │  Sessions, batches, state  │    │
-│  │  (Docker volume)    │  │                            │    │
-│  └────────────────────┘  └────────────────────────────┘    │
-└──────┬────────────────────────┬──────────────┬─────────────┘
-       │ eSCL (HTTP)            │ Volume mount  │ REST API (HTTPS)
+│  ┌────────────────────────────────────────────────────┐   │
+│  │              FastAPI Backend (API-first)             │   │
+│  │                                                    │   │
+│  │  REST API (/api/*)     MCP Server     SSE Events   │   │
+│  │  - Persons             - Tools        - Progress    │   │
+│  │  - Sessions            - Resources    - Status      │   │
+│  │  - Scanning            - Prompts      - Webhooks    │   │
+│  │  - Batches                                         │   │
+│  │  - Documents                                       │   │
+│  │  - Pipeline                                        │   │
+│  │  - Setup / Health                                  │   │
+│  └─────────────┬──────────────────┬───────────────────┘   │
+│                │                  │                        │
+│  ┌─────────────┴──────────────────┴───────────────────┐   │
+│  │              Processing Pipeline                    │   │
+│  │  Interleave → Blank Removal → OCR                  │   │
+│  │      → AI Split/Classify → Name → Save             │   │
+│  └────────────────────────────────────────────────────┘   │
+│                                                           │
+│  ┌────────────────────┐  ┌────────────────────────────┐   │
+│  │  Internal Storage   │  │  scanbox.db (SQLite)       │   │
+│  │  /app/data          │  │  Sessions, batches, state  │   │
+│  │  (Docker volume)    │  │                            │   │
+│  └────────────────────┘  └────────────────────────────┘   │
+└──────┬────────────────────────┬──────────────┬────────────┘
+       │ eSCL (HTTP)            │ Volume mount  │ REST API
        ▼                        ▼               ▼
 ┌──────────────┐    ┌────────────────┐   ┌──────────────────┐
-│ HP M283cdw   │    │ Output Storage │   │ PaperlessNGX     │
+│ Network      │    │ Output Storage │   │ PaperlessNGX     │
 │ Scanner      │    │ (any folder,   │   │ (optional)       │
-│              │    │  output volume,    │   │                  │
-└──────────────┘    │  USB drive)    │   │ Upload via API:  │
-                    └────────────────┘   │ - PDF + metadata │
-       │                                 │ - Tags           │
-       ▼                                 │ - Document type  │
-┌──────────────┐                         │ - Created date   │
-│ LLM Provider │                         └──────────────────┘
+│ (eSCL)       │    │  USB drive)    │   │ Upload via API   │
+└──────────────┘    └────────────────┘   └──────────────────┘
+       │
+       ▼
+┌──────────────┐
+│ LLM Provider │
 │ (Anthropic,  │
 │ Ollama, etc) │
 └──────────────┘
@@ -763,9 +790,15 @@ ANTHROPIC_API_KEY=sk-ant-...    # For LLM_PROVIDER=anthropic
 
 # Optional — override output directory (default: ./output next to compose file)
 # OUTPUT_DIR=/path/to/medical-records
+
+# Optional — API and integration settings
+# SCANBOX_API_KEY=              # Protect API with a bearer token (off by default for local use)
+# MCP_ENABLED=true              # Enable MCP server for AI agent integration
+# WEBHOOK_URL=                  # URL to receive event notifications
+# WEBHOOK_SECRET=               # HMAC-SHA256 secret for webhook signatures
 ```
 
-**Minimal config:** Copy `.env.example` to `.env`, set `SCANNER_IP` and one LLM provider. PaperlessNGX and output directory are optional — defaults work out of the box.
+**Minimal config:** Copy `.env.example` to `.env`, set `SCANNER_IP` and one LLM provider. Everything else is optional — defaults work out of the box.
 
 **LLM provider can also be configured in the web UI** during first-run setup. The `.env` is just for pre-configuration or headless deployment.
 
@@ -811,6 +844,7 @@ Stored in `scanbox-data` volume as `config/persons.json`:
 | AI splitting | `litellm` == 1.82.6 (pinned) | Unified LLM API. **Pinned due to supply chain incident on 1.82.7-1.82.8.** |
 | PDF rendering | `pdf2image` + `poppler-utils` | Render PDF pages to images for blank detection and OCR |
 | Database | SQLite via `aiosqlite` | Session state, scan history, batch/document tracking |
+| MCP server | `mcp` Python SDK | Model Context Protocol for AI agent integration |
 | Container base | `python:3.13-slim` + Tesseract/Ghostscript/Poppler | Multi-arch (amd64+arm64) |
 
 ### Container Dependencies (apt)
@@ -820,7 +854,7 @@ tesseract-ocr
 tesseract-ocr-eng
 ghostscript          # Required by ocrmypdf >= 17
 poppler-utils
-libgl1-mesa-glx     # For Pillow image processing
+libgl1              # For Pillow image processing (virtual package)
 ```
 
 ### Python Dependencies
@@ -871,13 +905,23 @@ scanbox/
 │   │   ├── namer.py            # Medical document naming logic
 │   │   └── output.py           # Archive, medical-records, PaperlessNGX output
 │   │
-│   ├── api/                    # FastAPI route handlers
+│   ├── api/                    # FastAPI route handlers (primary interface)
 │   │   ├── __init__.py
 │   │   ├── sessions.py         # Session CRUD
 │   │   ├── scanning.py         # Scan initiation, status polling
+│   │   ├── batches.py          # Batch status, reprocess
 │   │   ├── processing.py       # Pipeline status, results
 │   │   ├── persons.py          # Person profile management
-│   │   └── documents.py        # Result browsing, metadata editing, export
+│   │   ├── documents.py        # Result browsing, metadata editing, export
+│   │   ├── setup.py            # First-run setup and health checks
+│   │   ├── webhooks.py         # Webhook registration and delivery
+│   │   ├── sse.py              # SSE event bus for progress communication
+│   │   └── paperless.py        # PaperlessNGX API client
+│   │
+│   ├── mcp/                    # MCP server for AI agent integration
+│   │   ├── __init__.py
+│   │   ├── server.py           # MCP server setup (tools, resources, prompts)
+│   │   └── tools.py            # Tool implementations wrapping API logic
 │   │
 │   └── templates/              # Jinja2 HTML templates
 │       ├── base.html
@@ -973,6 +1017,53 @@ After the first batch is processed, set up these views in PaperlessNGX for clean
 ### No PaperlessNGX? No Problem.
 
 PaperlessNGX is optional. Without it, ScanBox still scans, processes, splits, names, and writes organized PDFs to the output volume. You just won't get the search/tagging features. PaperlessNGX can be connected later without re-scanning — ScanBox can re-export any past session.
+
+## Integration & Automation
+
+### Webhooks
+
+ScanBox can notify external systems when events occur. Register webhook URLs via the API or environment variables.
+
+| Event | Trigger | Payload |
+|-------|---------|---------|
+| `scan.completed` | ADF scan finishes (fronts or backs) | Batch ID, page count, side |
+| `processing.completed` | Pipeline finishes for a batch | Batch ID, document count, document summaries |
+| `processing.stage_completed` | Each pipeline stage finishes | Batch ID, stage name, details |
+| `save.completed` | Documents saved to all destinations | Batch ID, file paths, PaperlessNGX IDs |
+| `review.needed` | Low-confidence split detected | Batch ID, document ID, confidence score |
+
+**Configuration:**
+```bash
+# Environment variables
+WEBHOOK_URL=https://example.com/hooks/scanbox
+WEBHOOK_SECRET=your-secret        # HMAC-SHA256 signature in X-Webhook-Signature header
+
+# Or via API
+POST /api/webhooks {"url": "...", "events": ["processing.completed", "save.completed"]}
+```
+
+Webhook payloads are JSON with a standard envelope: `{"event": "...", "timestamp": "...", "data": {...}}`. All webhooks include an HMAC-SHA256 signature for verification.
+
+### MCP Server (AI Agent Integration)
+
+ScanBox exposes a **Model Context Protocol (MCP) server** that enables AI agents to interact with every capability — scanning, reviewing, correcting, and saving — through native tool calls.
+
+This makes ScanBox a first-class tool in any MCP-compatible AI workflow. An AI agent can:
+- Trigger a scan and monitor progress
+- Review extracted documents and correct metadata
+- Adjust document boundaries
+- Save results to all destinations
+- Query past sessions and documents
+
+**Enable:** Set `MCP_ENABLED=true` in your environment. The MCP server runs alongside the REST API on the same port.
+
+See `docs/mcp-server.md` for the complete specification including tools, resources, prompts, and integration examples.
+
+### REST API
+
+Every ScanBox capability is exposed through a documented REST API. FastAPI auto-generates an OpenAPI spec at `/api/openapi.json` and interactive docs at `/api/docs`.
+
+See `docs/api-spec.md` for the complete API reference.
 
 ## Deployment
 
