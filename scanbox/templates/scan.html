@@ -63,8 +63,9 @@
           Scan Back Sides
         </button>
         <a href="#" class="text-brand-600 hover:text-brand-700 text-base no-underline"
-           hx-post="/api/batches/{{ batch.id }}/skip-backs"
-           @click="step2Done = true; currentStep = 3">
+           hx-post="/batches/{{ batch.id }}/skip-backs"
+           hx-swap="none"
+           @htmx:after-request.camel="step2Done = true; currentStep = 3">
           No back sides &mdash; skip this &rarr;
         </a>
       </div>

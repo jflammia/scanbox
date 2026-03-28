@@ -1,0 +1,11 @@
+{% for person in persons %}
+<div class="flex items-center justify-between p-3 border border-border rounded-md bg-white">
+  <div>
+    <span class="font-medium text-text-primary">{{ person.display_name }}</span>
+    <span class="text-xs text-text-muted ml-2">{{ person.created[:10] }}</span>
+  </div>
+</div>
+{% endfor %}
+{% if not persons %}
+<p class="text-text-muted">No people added yet.</p>
+{% endif %}
