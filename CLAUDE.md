@@ -35,7 +35,7 @@ Non-negotiable. Follow even when the user doesn't ask:
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 bash .githooks/setup.sh              # Git hooks + rebase config
-brew install tesseract poppler       # macOS system deps
+brew install tesseract poppler ghostscript  # macOS system deps
 python -m tests.generate_fixtures    # Generate test PDFs
 
 # Test
@@ -153,7 +153,7 @@ Git config enforces this: `pull.rebase=true`, `merge.ff=only`.
 
 ## Key Conventions
 
-- Python >= 3.12
+- Python >= 3.13
 - ruff line-length: 100
 - All env vars in `scanbox/config.py` with sensible defaults
 - LLM provider configurable via `LLM_PROVIDER` env var (anthropic, openai, ollama)

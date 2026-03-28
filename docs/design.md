@@ -96,7 +96,7 @@ When a user corrects something:
 ┌──────────────┐    ┌────────────────┐   ┌──────────────────┐
 │ HP M283cdw   │    │ Output Storage │   │ PaperlessNGX     │
 │ Scanner      │    │ (any folder,   │   │ (optional)       │
-│              │    │  NAS mount,    │   │                  │
+│              │    │  output volume,    │   │                  │
 └──────────────┘    │  USB drive)    │   │ Upload via API:  │
                     └────────────────┘   │ - PDF + metadata │
        │                                 │ - Tags           │
@@ -277,7 +277,7 @@ See the card layout in the "Results Browsing" section below. The results screen 
 | "OCR confidence below threshold" | "Some text on this page was hard to read" |
 | "Pipeline stage failed" | "Something went wrong while processing batch 3. You can try again." |
 | "Interleave mismatch" | "The front and back page counts don't match — did a page get stuck?" |
-| "NAS mount unavailable" | "Can't save files right now. The storage drive may be disconnected." |
+| "output volume unavailable" | "Can't save files right now. The storage drive may be disconnected." |
 | "API rate limit exceeded" | "The document analyzer is busy. It will try again in a moment." |
 | "Batch processing queued" | "Working on it — you can keep scanning while this finishes" |
 
@@ -371,14 +371,12 @@ The results browser uses **document cards** rather than a data table — more vi
 Key UX details:
 - **PDF thumbnails** — first page rendered as a small preview so users can visually identify documents without opening them.
 - **Yellow "Needs Review" cards** for low-confidence splits or missing metadata. These have a "Fix This" button instead of the normal "Edit Info".
-- **Confirmation gate** — "Save Everything" only appears after the user has seen all cards. Nothing is written to the NAS or PaperlessNGX until the user explicitly confirms.
+- **Confirmation gate** — "Save Everything" only appears after the user has seen all cards. Nothing is saved until the user explicitly confirms.
 - **"I need to fix some"** expands inline editing tools (not a separate page).
 
 ### Re-Run & Manual Correction
 
-**Every stage of the pipeline can be re-run independently**, at the batch level or individual document level. All intermediate artifacts are preserved — nothing is discarded after processing.
-
-All intermediate files are preserved in internal storage (see Storage Architecture section). Any stage can be re-run without re-scanning.
+**Every stage of the pipeline can be re-run independently.** All intermediate files are preserved in internal storage (see Storage Architecture). Any stage can be re-run without re-scanning.
 
 #### What You Can Fix After Processing
 
@@ -425,7 +423,7 @@ When the AI gets a boundary wrong, the user needs a simple way to fix it. The sp
 
 #### Saving
 
-One button: **"Save."** It writes to all three destinations (archive, medical records folder, PaperlessNGX) in one action. No choices, no routing, no separate export steps. If corrections are made later, "Save Again" overwrites the previous output cleanly.
+One button: **"Save."** It writes to all destinations (archive, medical records folder, Index.csv, and PaperlessNGX if configured) in one action. No choices, no routing, no separate export steps. If corrections are made later, "Save Again" overwrites the previous output cleanly.
 
 #### Past Sessions
 
@@ -443,7 +441,7 @@ Errors are presented as **friendly inline messages** with clear next actions, no
 | AI splitting uncertain | Yellow-highlighted card: "We're not sure where this document starts. Take a quick look and adjust if needed." [Fix This] |
 | OCR quality poor | Small note on card: "Some text on this page was hard to read. The document is still saved, but search may not find everything." |
 | Processing failed | "Something went wrong while processing Batch 3. Your scans are safe — nothing is lost. You can try again." [Reprocess Batch] |
-| NAS unreachable | "Can't save files right now — the storage drive may be disconnected. Your scans are safe in ScanBox. You can save them once the drive is back." [Retry] |
+| output folder unreachable | "Can't save files right now — the storage drive may be disconnected. Your scans are safe in ScanBox. You can save them once the drive is back." [Retry] |
 | AI API unreachable | "The document analyzer isn't available right now. We'll keep trying in the background. You can keep scanning." |
 
 ## Persistence & Progress
@@ -674,11 +672,11 @@ Everything ScanBox needs to operate: session data, intermediate files, processin
 └── scanbox.db                      # SQLite (sessions, batches, documents)
 ```
 
-**This is the safety net.** Even if PaperlessNGX is down, the NAS is offline, or an export fails, all scans and processing results are preserved here. The user can always come back and re-export.
+**This is the safety net.** Even if PaperlessNGX is down, the output folder is offline, or an export fails, all scans and processing results are preserved here. The user can always come back and re-export.
 
 ### Export Storage (User-Configured Output Directory)
 
-A single mounted volume where ScanBox writes final output. This is where the user points ScanBox at whatever storage they have — a NAS mount, a local folder, an external drive, anything.
+A single mounted volume where ScanBox writes final output. This is where the user points ScanBox at whatever storage they have — a output volume, a local folder, an external drive, anything.
 
 ```
 /output/                            # Docker volume: user-mounted
@@ -693,7 +691,7 @@ A single mounted volume where ScanBox writes final output. This is where the use
     │   ├── Radiology Reports/
     │   ├── Discharge Summaries/
     │   └── ...
-    └── Jane_Flammia/               # Future
+    └── Jane_Doe/               # Future
 ```
 
 **This is the shareable output.** Copy the `medical-records/John_Doe/` folder to a USB drive and hand it to a doctor.
@@ -719,7 +717,7 @@ ScanBox sends documents to PaperlessNGX via its **REST API**, not by dropping fi
 | Check upload status | `GET /api/documents/?query=...` | Verify document was ingested |
 
 **Configuration:** ScanBox needs only two values to talk to PaperlessNGX:
-- `PAPERLESS_URL`: e.g., `https://paperless.blueshift.xyz`
+- `PAPERLESS_URL`: e.g., `https://paperless.example.com`
 - `PAPERLESS_API_TOKEN`: Generated in PaperlessNGX settings (Settings > API tokens)
 
 **First-run setup guides the user through this** with step-by-step instructions showing exactly where to find the API token in PaperlessNGX.
@@ -764,7 +762,7 @@ ANTHROPIC_API_KEY=sk-ant-...    # For LLM_PROVIDER=anthropic
 # PAPERLESS_API_TOKEN=
 
 # Optional — override output directory (default: ./output next to compose file)
-# OUTPUT_DIR=/mnt/nas/medical-scanning
+# OUTPUT_DIR=/path/to/medical-records
 ```
 
 **Minimal config:** Copy `.env.example` to `.env`, set `SCANNER_IP` and one LLM provider. PaperlessNGX and output directory are optional — defaults work out of the box.
@@ -890,9 +888,10 @@ scanbox/
 │
 ├── static/                     # CSS, JS, icons
 │   ├── css/
-│   │   └── tailwind.min.css
+│   │   └── app.css             # Generated by Tailwind CSS standalone CLI at build time
 │   ├── js/
-│   │   └── alpine.min.js
+│   │   ├── htmx.min.js         # htmx 2.0 (server-driven HTML swapping + SSE)
+│   │   └── alpine.min.js       # Alpine.js 3.15 (client-side UI state)
 │   └── icons/
 │
 └── tests/
@@ -979,12 +978,12 @@ PaperlessNGX is optional. Without it, ScanBox still scans, processes, splits, na
 
 ### Runs Anywhere Docker Runs
 
-ScanBox is a single Docker image with zero external dependencies beyond the printer and (optionally) PaperlessNGX. It runs identically on a laptop and on infrastructure.
+ScanBox is a single Docker image with zero external dependencies beyond the printer, an LLM provider, and (optionally) PaperlessNGX. It runs identically on a laptop and on infrastructure.
 
 | Environment | How to Run | Output Volume |
 |-------------|-----------|---------------|
 | **Laptop (macOS/Linux/Windows)** | `docker compose up` | A local folder (e.g., `~/Medical-Records`) |
-| **Homelab server** | Komodo stack, systemd, or `docker compose up` | NFS mount, local disk, whatever |
+| **Linux server** | systemd, `docker compose up`, or any orchestrator | Local disk, network mount, any volume |
 | **Any cloud VM** | `docker compose up` | Attached volume |
 
 Requirements (same everywhere):
@@ -998,8 +997,8 @@ The Docker image builds for both **linux/amd64** (Intel/AMD servers) and **linux
 
 ```dockerfile
 # Dockerfile uses multi-stage build, works on both architectures
-FROM python:3.12-slim AS base
-# tesseract-ocr, poppler-utils are multi-arch in Debian
+FROM python:3.13-slim AS base
+# tesseract-ocr, ghostscript, poppler-utils are multi-arch in Debian
 ```
 
 ### Laptop Quick Start
@@ -1018,38 +1017,32 @@ docker compose up
 # Open http://localhost:8090
 ```
 
-The default `docker-compose.yml` maps `./output` as the output volume — a plain folder next to the repo. No NAS, no special mounts. On a homelab server, swap that path for an NFS mount or wherever you want the files.
+The default `docker-compose.yml` maps `./output` as the output volume — a plain folder next to the repo. No special mounts required. On a server, swap that path for wherever you want the files.
 
 ### No Lock-In
 
 Nothing in ScanBox depends on:
 - A specific host or hostname
-- NFS or any particular filesystem
-- Komodo or any particular orchestrator
+- Any particular filesystem or network mount
+- Any particular orchestrator
 - A specific network subnet
 - A specific LLM provider (swap Anthropic for Ollama or OpenAI anytime)
 - PaperlessNGX (optional integration)
 
-## Security Considerations
+## Security & Privacy
 
-- **LLM API keys**: Injected via environment variables. Store securely (1Password, vault, etc.).
-- **No authentication on web UI**: Intended for local network use only. Traefik can add auth if exposed externally.
-- **Medical data**: All processing happens locally. Only OCR text (not images/PDFs) is sent to the LLM provider for splitting. No PHI leaves the network in image form.
-- **eSCL has no auth**: The printer's eSCL endpoint is unauthenticated. Anyone on the LAN can initiate scans. This is an HP limitation, not a ScanBox issue.
-
-## Privacy Note on AI Splitting
-
-The AI splitting step sends OCR-extracted **text only** to the configured LLM provider. This text will contain PHI (patient names, dates, diagnoses). No images or PDFs leave the network.
-
-**Choose your privacy level:**
+- **LLM API keys**: Injected via environment variables. Store securely (secrets manager, vault, etc.).
+- **No authentication on web UI**: Intended for local network use only. A reverse proxy can add auth if exposed externally.
+- **eSCL has no auth**: The printer's eSCL endpoint is unauthenticated. Anyone on the LAN can initiate scans. This is a scanner limitation, not a ScanBox issue.
+- **Medical data**: All processing happens locally. The AI splitting step sends OCR-extracted **text only** to the LLM provider (no images or PDFs leave the network).
 
 | Provider | Data Leaves Network? | Notes |
 |----------|---------------------|-------|
-| **Ollama** (local) | No | Runs on your own hardware. Fully offline. Slower but maximum privacy. |
-| **Anthropic** (cloud) | Yes (text only) | API data policy: inputs not used for training. |
-| **OpenAI** (cloud) | Yes (text only) | Check current data policy for API usage. |
+| **Ollama** (local) | No | Fully offline. Maximum privacy. |
+| **Anthropic** (cloud) | Yes (text only) | API inputs not used for training. |
+| **OpenAI** (cloud) | Yes (text only) | Check current data policy. |
 
-For maximum privacy with medical records, use **Ollama with a capable local model** (e.g., Llama 3, Mistral). ScanBox works identically regardless of provider — only the speed and accuracy may differ.
+For maximum privacy with medical records, use Ollama. ScanBox works identically regardless of provider.
 
 ## Testing Strategy
 
@@ -1183,7 +1176,7 @@ The validation layer (separate from AI) enforces:
 |-----------|-------|----------|
 | Archive write | Combined PDF + metadata | Files exist at correct archive path |
 | Medical records write | Split PDFs + metadata | Files in correct type subdirectories |
-| PaperlessNGX write | Split PDFs + person slug | Files in correct consume subdirectory |
+| PaperlessNGX upload | Split PDFs + metadata | API called with correct tags, type, date |
 | Index.csv append | New documents | CSV rows appended, headers preserved |
 | Index.csv create | First documents for person | CSV created with headers + rows |
 | Directory creation | New person, new types | All directories created on demand |
@@ -1257,7 +1250,6 @@ Test Container                    Mock eSCL Server
        │
        ▼
   /tmp/test-output/
-  ├── consume/
   ├── archive/
   └── medical-records/
 ```
@@ -1272,7 +1264,7 @@ Test Container                    Mock eSCL Server
 7. **Verify:**
    - Archive contains `batch-001-fronts.pdf`, `batch-001-backs.pdf`, `batch-001-combined.pdf`.
    - Medical records folder has correct subdirectories and named PDFs.
-   - PaperlessNGX consume folder has files in `medical-records/person:test-patient/`.
+   - PaperlessNGX API mock received upload calls with correct tags and metadata.
    - Index.csv has entries for all split documents.
    - All PDFs are valid (parseable by pikepdf).
    - All PDFs have OCR text layer (searchable).
@@ -1378,7 +1370,7 @@ These verify the system handles failures gracefully and doesn't lose data.
 | Scenario | Test Method | Expected Behavior |
 |----------|-------------|-------------------|
 | **Container restart mid-processing** | Kill container during pipeline execution | On restart: incomplete batch is detected, re-processable from last checkpoint |
-| **NAS disconnects during output** | Unmount NAS volume mid-write | Error logged, batch stays in processing queue, retryable when NAS returns |
+| **output folder disconnects during output** | Unmount output folder volume mid-write | Error logged, batch stays in processing queue, retryable when output folder returns |
 | **LLM API unreachable** | Block LLM endpoint | Pipeline pauses at split stage, batch queued for retry, clear error in UI |
 | **AI returns garbage** | Mock returns invalid JSON | Validation catches, batch flagged for manual review, no data loss |
 | **Disk full** | Fill tmpfs | Error before corruption, clear message, no partial files |

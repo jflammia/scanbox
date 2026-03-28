@@ -44,7 +44,7 @@ Your scanner's touchscreen is never used. Everything is controlled from the web 
 - **Crash-safe** — every stage checkpoints to disk; nothing is lost if the app restarts
 - **PaperlessNGX integration** (optional) — upload via API with tags, types, and dates
 - **Any LLM provider** — Anthropic, OpenAI, or Ollama (local, fully offline)
-- **Runs anywhere** — laptop, homelab server, or cloud VM
+- **Runs anywhere** — laptop, home server, or cloud VM
 
 ## Quick Start
 
@@ -129,7 +129,7 @@ ScanBox communicates via the **eSCL** (Apple AirScan) protocol — an industry s
 # Setup
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-brew install tesseract poppler   # macOS system deps
+brew install tesseract poppler ghostscript  # macOS system deps
 bash .githooks/setup.sh          # Git hooks
 
 # Test

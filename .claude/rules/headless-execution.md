@@ -64,7 +64,7 @@ python -m tests.generate_fixtures
 On macOS, install system deps:
 
 ```bash
-brew install tesseract poppler
+brew install tesseract poppler ghostscript
 ```
 
 ## Progress Tracking

@@ -74,7 +74,7 @@ ScanBox was designed in a brainstorming session on 2026-03-28 between the projec
 - `--skip-text` flag is important — don't re-OCR pages that already have a text layer
 - `--deskew` corrects slightly rotated pages from the ADF
 - ocrmypdf is a command-line tool, called via `subprocess.run`
-- It requires `tesseract-ocr` and `poppler-utils` as system packages
+- It requires `tesseract-ocr`, `ghostscript` (since v17), and `poppler-utils` as system packages
 
 ### litellm
 
@@ -95,5 +95,6 @@ These must be installed in the Docker image AND on the development machine:
 | Package | apt Name | brew Name | Purpose |
 |---------|----------|-----------|---------|
 | Tesseract | `tesseract-ocr tesseract-ocr-eng` | `tesseract` | OCR engine |
+| Ghostscript | `ghostscript` | `ghostscript` | Required by ocrmypdf >= 17 |
 | Poppler | `poppler-utils` | `poppler` | PDF-to-image rendering |
 | libgl1 | `libgl1-mesa-glx` | (included in macOS) | Pillow image processing |

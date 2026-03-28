@@ -4,9 +4,9 @@
 
 **Goal:** Build a self-contained Docker app that controls an HP scanner via eSCL, processes scans through an automated pipeline (interleave, blank removal, OCR, AI split), and outputs organized medical records.
 
-**Architecture:** FastAPI backend with Jinja2+Alpine.js frontend. Pipeline stages are independent pure functions with checkpointed state. eSCL scanner communication via direct HTTP. LLM integration via litellm. SQLite for session state.
+**Architecture:** FastAPI backend with Jinja2+htmx+Alpine.js frontend. Pipeline stages are independent pure functions with checkpointed state. eSCL scanner communication via direct HTTP. LLM integration via litellm. SQLite for session state.
 
-**Tech Stack:** Python 3.12, FastAPI, pikepdf, ocrmypdf, litellm, httpx, Pillow, pdf2image, Alpine.js, Tailwind CSS
+**Tech Stack:** Python 3.13, FastAPI 0.135+, pikepdf, ocrmypdf 17+, litellm==1.82.6 (pinned — see `.claude/rules/tech-stack-2026.md`), httpx, htmx 2.0, Alpine.js 3.15, Tailwind CSS 4.2, jinja2-fragments
 
 **Design spec:** `docs/design.md` — the authoritative reference for all behavior.
 
@@ -1300,9 +1300,10 @@ Expected: FAIL
 ```python
 """AI-powered document boundary detection and classification.
 
-Uses litellm to call any LLM provider (Anthropic, OpenAI, Ollama) with the
-same prompt. The validation layer ensures the LLM output is structurally
-correct before it's used.
+Uses litellm==1.82.6 (PINNED — versions 1.82.7/1.82.8 were compromised in a
+supply chain attack, March 2026. See .claude/rules/tech-stack-2026.md) to call
+any LLM provider (Anthropic, OpenAI, Ollama) with the same prompt. The
+validation layer ensures the LLM output is structurally correct before use.
 """
 
 import json
@@ -2348,7 +2349,7 @@ git commit -m "milestone: complete Phase 1 — pipeline core with unit tests"
 
 ## Phase 2: API + Web UI
 
-> **Note to implementing agent:** Phase 2 builds the FastAPI API layer, web UI templates, SSE progress, and session management. The tasks below define the API routes, database schema, and template structure. Frontend templates use server-side Jinja2 rendering with Alpine.js for reactivity and Tailwind CSS for styling. Phase 2 tasks should follow the same TDD pattern — write the test, make it fail, implement, make it pass, commit.
+> **Note to implementing agent:** Phase 2 builds the FastAPI API layer, web UI templates, SSE progress, and session management. The tasks below define the API routes, database schema, and template structure. Frontend uses Jinja2 server-side rendering with htmx for server communication (including SSE progress), Alpine.js for client-side UI state, Tailwind CSS 4 for styling, and jinja2-fragments for partial template rendering. See `.claude/rules/tech-stack-2026.md` for patterns. Phase 2 tasks should follow the same TDD pattern — write the test, make it fail, implement, make it pass, commit.
 
 ### Task 11: Database Schema
 
@@ -2467,7 +2468,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # System deps (macOS)
-brew install tesseract poppler
+brew install tesseract poppler ghostscript
 
 # Generate test fixtures
 python -m tests.generate_fixtures
