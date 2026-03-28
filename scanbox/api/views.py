@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from scanbox.api.setup import _read_setup
@@ -48,6 +49,75 @@ async def results(request: Request, batch_id: str):
     return templates.TemplateResponse(
         request, "results.html", {"batch": batch, "documents": documents}
     )
+
+
+@router.post("/scan/start")
+async def scan_start(
+    person_id: str = Form(...),
+    new_person_name: str = Form(""),
+):
+    db = get_db()
+
+    if person_id == "__new__" and new_person_name.strip():
+        person = await db.create_person(new_person_name.strip())
+        person_id = person["id"]
+
+    session = await db.create_session(person_id)
+    batch = await db.create_batch(session["id"])
+    return RedirectResponse(
+        url=f"/scan/{session['id']}/{batch['id']}",
+        status_code=303,
+    )
+
+
+@router.get("/documents/{document_id}/edit", response_class=HTMLResponse)
+async def document_edit_form(request: Request, document_id: str):
+    db = get_db()
+    doc = await db.get_document(document_id)
+    if not doc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Document not found")
+    return templates.TemplateResponse(request, "document_edit.html", {"doc": doc})
+
+
+@router.post("/documents/{document_id}/edit", response_class=HTMLResponse)
+async def document_edit_submit(
+    request: Request,
+    document_id: str,
+    document_type: str = Form(""),
+    date_of_service: str = Form(""),
+    facility: str = Form(""),
+    provider: str = Form(""),
+    description: str = Form(""),
+):
+    db = get_db()
+    doc = await db.get_document(document_id)
+    if not doc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    updates = {}
+    for field in ("document_type", "date_of_service", "facility", "provider", "description"):
+        val = locals()[field]
+        if val:
+            updates[field] = val
+    if updates:
+        updates["user_edited"] = True
+    doc = await db.update_document(document_id, **updates)
+    return templates.TemplateResponse(request, "document_card.html", {"doc": doc})
+
+
+@router.get("/documents/{document_id}/card", response_class=HTMLResponse)
+async def document_card(request: Request, document_id: str):
+    db = get_db()
+    doc = await db.get_document(document_id)
+    if not doc:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Document not found")
+    return templates.TemplateResponse(request, "document_card.html", {"doc": doc})
 
 
 @router.get("/settings")

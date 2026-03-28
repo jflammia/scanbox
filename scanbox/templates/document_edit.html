@@ -1,0 +1,51 @@
+<form method="post" action="/documents/{{ doc.id }}/edit"
+      hx-post="/documents/{{ doc.id }}/edit"
+      hx-target="#doc-{{ doc.id }}"
+      hx-swap="outerHTML"
+      class="p-4 border border-border rounded-lg space-y-3">
+  <h3 class="font-semibold text-lg">Edit Document</h3>
+
+  <label class="block text-sm font-medium">
+    Document Type
+    <input type="text" name="document_type" value="{{ doc.document_type or '' }}"
+           class="w-full border border-border rounded-md p-2 mt-1">
+  </label>
+
+  <label class="block text-sm font-medium">
+    Date of Service
+    <input type="text" name="date_of_service" value="{{ doc.date_of_service or '' }}"
+           class="w-full border border-border rounded-md p-2 mt-1">
+  </label>
+
+  <label class="block text-sm font-medium">
+    Facility
+    <input type="text" name="facility" value="{{ doc.facility or '' }}"
+           class="w-full border border-border rounded-md p-2 mt-1">
+  </label>
+
+  <label class="block text-sm font-medium">
+    Provider
+    <input type="text" name="provider" value="{{ doc.provider or '' }}"
+           class="w-full border border-border rounded-md p-2 mt-1">
+  </label>
+
+  <label class="block text-sm font-medium">
+    Description
+    <input type="text" name="description" value="{{ doc.description or '' }}"
+           class="w-full border border-border rounded-md p-2 mt-1">
+  </label>
+
+  <div class="flex gap-2">
+    <button type="submit"
+            class="bg-brand-600 text-white px-4 py-2 rounded-md font-medium hover:bg-brand-700">
+      Save
+    </button>
+    <a href="/documents/{{ doc.id }}/card"
+       hx-get="/documents/{{ doc.id }}/card"
+       hx-target="#doc-{{ doc.id }}"
+       hx-swap="outerHTML"
+       class="px-4 py-2 border border-border rounded-md font-medium no-underline text-text-primary">
+      Cancel
+    </a>
+  </div>
+</form>
