@@ -76,6 +76,8 @@ a:hover { color: var(--color-brand-700); }
 .space-y-8 > * + * { margin-top: 2rem; }
 
 /* Padding */
+.p-2 { padding: 0.5rem; }
+.p-3 { padding: 0.75rem; }
 .p-4 { padding: 1rem; }
 .p-6 { padding: 1.5rem; }
 .p-8 { padding: 2rem; }
@@ -96,9 +98,11 @@ a:hover { color: var(--color-brand-700); }
 .mb-1 { margin-bottom: 0.25rem; }
 .mb-4 { margin-bottom: 1rem; }
 .ml-2 { margin-left: 0.5rem; }
+.mt-1 { margin-top: 0.25rem; }
 .mt-2 { margin-top: 0.5rem; }
 .mt-3 { margin-top: 0.75rem; }
 .mt-4 { margin-top: 1rem; }
+.mt-8 { margin-top: 2rem; }
 
 /* Width / Height */
 .w-3 { width: 0.75rem; }
@@ -170,6 +174,7 @@ a:hover { color: var(--color-brand-700); }
 /* Borders */
 .border { border-width: 1px; border-style: solid; }
 .border-2 { border-width: 2px; border-style: solid; }
+.border-t { border-top-width: 1px; border-top-style: solid; }
 .border-border { border-color: var(--color-border); }
 .border-brand-200 { border-color: var(--color-brand-200); }
 .border-brand-300 { border-color: var(--color-brand-300); }
