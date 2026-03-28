@@ -802,22 +802,25 @@ Stored in `scanbox-data` volume as `config/persons.json`:
 
 | Component | Technology | Why |
 |-----------|-----------|-----|
-| Backend | Python 3.12 + FastAPI | Strong PDF/OCR ecosystem, async, lightweight |
-| Frontend | HTML + Alpine.js + Tailwind CSS | No build step, fast to develop, reactive enough for this UI |
+| Backend | Python 3.13 + FastAPI 0.135+ | Strong PDF/OCR ecosystem, async, native SSE support |
+| Server rendering | Jinja2 + `jinja2-fragments` | Render full pages or htmx partial blocks from same template |
+| Interactivity | htmx 2.0 + Alpine.js 3.15 | htmx for server-driven HTML swapping + SSE; Alpine for client-side UI state |
+| Styling | Tailwind CSS 4.2 (standalone CLI) | CSS-native config, no Node.js, built at Docker build time |
 | Scanner comm | `httpx` (async HTTP) | Direct eSCL calls, no SANE dependency |
-| PDF manipulation | `pikepdf` | Fast, reliable, handles merge/split/page extraction |
-| OCR | `ocrmypdf` (wraps Tesseract 5) | Searchable PDF creation, deskew, image optimization |
-| Blank detection | `Pillow` | Render PDF pages, analyze pixel coverage |
-| AI splitting | `litellm` | Unified API for any LLM provider (Anthropic, OpenAI, Ollama, etc.) |
+| PDF manipulation | `pikepdf` 10.5+ | Fast, reliable, handles merge/split/page extraction/metadata |
+| OCR | `ocrmypdf` 17+ (Tesseract + Ghostscript) | Searchable PDF creation, deskew, image optimization |
+| Blank detection | `Pillow` 12+ | Render PDF pages, analyze pixel coverage |
+| AI splitting | `litellm` == 1.82.6 (pinned) | Unified LLM API. **Pinned due to supply chain incident on 1.82.7-1.82.8.** |
 | PDF rendering | `pdf2image` + `poppler-utils` | Render PDF pages to images for blank detection and OCR |
-| Database | SQLite | Session state, scan history, batch/document tracking |
-| Container base | `python:3.12-slim` + Tesseract apt packages | Minimal image size |
+| Database | SQLite via `aiosqlite` | Session state, scan history, batch/document tracking |
+| Container base | `python:3.13-slim` + Tesseract/Ghostscript/Poppler | Multi-arch (amd64+arm64) |
 
 ### Container Dependencies (apt)
 
 ```
 tesseract-ocr
 tesseract-ocr-eng
+ghostscript          # Required by ocrmypdf >= 17
 poppler-utils
 libgl1-mesa-glx     # For Pillow image processing
 ```
@@ -825,17 +828,18 @@ libgl1-mesa-glx     # For Pillow image processing
 ### Python Dependencies
 
 ```
-fastapi
-uvicorn
+fastapi>=0.135
+uvicorn[standard]
 httpx
-pikepdf
-ocrmypdf
-Pillow
+pikepdf>=10
+ocrmypdf>=17
+Pillow>=12
 pdf2image
-litellm              # Unified LLM API (Anthropic, OpenAI, Ollama, etc.)
+litellm==1.82.6      # Pinned — 1.82.7/1.82.8 compromised (supply chain attack)
 python-multipart
 aiosqlite
-jinja2               # Server-side template rendering
+jinja2
+jinja2-fragments     # Render individual Jinja2 blocks for htmx partial updates
 ```
 
 ## Directory Structure (New Repo)

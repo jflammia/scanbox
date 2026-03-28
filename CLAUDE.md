@@ -88,9 +88,10 @@ Scanner (eSCL HTTP) → FastAPI backend → Processing pipeline → Output
 - **eSCL protocol**: HTTP REST + XML. Endpoints: `/eSCL/ScannerCapabilities`, `/eSCL/ScannerStatus`, `/eSCL/ScanJobs` (POST to start, GET NextDocument in loop, DELETE to cancel). See `docs/design.md` "Scanner Communication" section.
 - **Pipeline checkpointing**: Each stage writes output to disk before the next begins. `state.json` in each batch dir tracks progress. On crash, pipeline resumes from last completed stage.
 - **Batch state machine**: `scanning_fronts → fronts_done → scanning_backs → backs_done → processing → review → saved`. See `docs/design.md` "Persistence & Progress" section.
-- **AI splitting**: litellm calls any LLM with a structured prompt. Response is validated (contiguous, non-overlapping, full coverage). See `docs/design.md` "Stage 4" section.
-- **SSE progress**: Backend pushes progress to frontend via Server-Sent Events (one-way stream, not WebSocket).
+- **AI splitting**: litellm==1.82.6 (pinned — supply chain incident on 1.82.7/1.82.8) calls any LLM with a structured prompt. Response is validated (contiguous, non-overlapping, full coverage). See `docs/design.md` "Stage 4" section.
+- **Frontend**: htmx 2.0 for server-driven HTML swapping + SSE progress. Alpine.js 3.15 for client-side UI state. Tailwind CSS 4.2 (standalone CLI, no Node.js). jinja2-fragments for rendering partial template blocks.
 - **Two storage volumes**: Internal (`/app/data` — sessions, processing state) and Output (`/output` — archive + medical records folder). PaperlessNGX via REST API, not filesystem.
+- **Tech stack research**: See `.claude/rules/tech-stack-2026.md` for full version rationale and security notes.
 
 ## Design Spec
 

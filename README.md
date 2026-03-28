@@ -141,6 +141,8 @@ ruff format scanbox/ tests/
 ruff check scanbox/ tests/
 ```
 
+Built with Python 3.13, FastAPI, htmx, Alpine.js, Tailwind CSS, pikepdf, ocrmypdf, and litellm.
+
 See [CLAUDE.md](CLAUDE.md) for architecture details and contributing guidelines.
 
 ## License
