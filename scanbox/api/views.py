@@ -187,7 +187,11 @@ async def save_batch_html(request: Request, batch_id: str):
 
 @router.post("/batches/{batch_id}/skip-backs", response_class=HTMLResponse)
 async def skip_backs_html(request: Request, batch_id: str):
+    import asyncio
+
     from fastapi import HTTPException
+
+    from scanbox.api.scanning import process_after_skip_backs
 
     db = get_db()
     batch = await db.get_batch(batch_id)
@@ -199,6 +203,7 @@ async def skip_backs_html(request: Request, batch_id: str):
             detail=f"Cannot skip backs in state '{batch['state']}'.",
         )
     await db.update_batch_state(batch_id, "backs_skipped")
+    asyncio.create_task(process_after_skip_backs(batch_id, db))
     return HTMLResponse('<p class="text-status-success font-medium">Backs skipped</p>')
 
 
