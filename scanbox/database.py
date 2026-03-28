@@ -317,3 +317,14 @@ class Database:
             d["user_edited"] = bool(d["user_edited"])
             result.append(d)
         return result
+
+    async def delete_documents_by_batch(self, batch_id: str) -> int:
+        """Delete all documents for a batch. Returns count deleted."""
+        async with self._conn.execute(
+            "SELECT COUNT(*) FROM documents WHERE batch_id = ?", (batch_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            count = row[0]
+        await self._conn.execute("DELETE FROM documents WHERE batch_id = ?", (batch_id,))
+        await self._conn.commit()
+        return count
