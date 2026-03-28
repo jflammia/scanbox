@@ -3,7 +3,8 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -64,6 +65,17 @@ async def complete_setup(req: SetupCompleteRequest | None = None):
                 data[key] = val
     _write_setup(data)
     return {"completed": True}
+
+
+@router.post("/setup/add-person", response_class=HTMLResponse)
+async def setup_add_person(person_name: str = Form(...)):
+    from scanbox.main import get_db
+
+    db = get_db()
+    person = await db.create_person(person_name.strip())
+    return HTMLResponse(
+        f'<p class="text-status-success font-medium">Added {person["display_name"]}</p>'
+    )
 
 
 @router.get("/setup")

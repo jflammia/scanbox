@@ -73,12 +73,16 @@
     <div class="text-5xl">&#128100;</div>
     <h2 class="text-xl font-semibold">Who are these documents for?</h2>
     <p class="text-text-secondary">Enter the name of the person you'll be scanning records for.</p>
-    <input type="text" placeholder="e.g. John Doe"
-           class="w-full border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-    <button @click="step = 6"
-            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
-      Continue
-    </button>
+    <form hx-post="/setup/add-person" hx-target="#person-result" hx-swap="innerHTML"
+          @htmx:after-request.camel="setTimeout(() => step = 6, 800)">
+      <input type="text" name="person_name" placeholder="e.g. John Doe" required
+             class="w-full border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 mb-4">
+      <div id="person-result"></div>
+      <button type="submit"
+              class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+        Add &amp; Continue
+      </button>
+    </form>
   </div>
 
   {# Step 6: Done #}

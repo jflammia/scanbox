@@ -49,15 +49,23 @@
     <h2 class="text-2xl font-semibold mb-4">Past sessions</h2>
     <div class="space-y-3">
       {% for session in sessions %}
-      <a href="/results/{{ session.id }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
+      {% if session.latest_batch_id %}
+      <a href="/results/{{ session.latest_batch_id }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
+      {% else %}
+      <div class="block bg-surface-raised border border-border rounded-lg p-4">
+      {% endif %}
         <div class="flex items-center justify-between">
           <div>
-            <span class="font-semibold text-text-primary">{{ session.person_name | default("Unknown") }}</span>
+            <span class="font-semibold text-text-primary">{{ session.person_name }}</span>
             <span class="text-sm text-text-muted ml-2">{{ session.created[:10] }}</span>
           </div>
-          <span class="text-sm text-text-secondary">{{ session.document_count | default(0) }} docs</span>
+          <span class="text-sm text-text-secondary">{{ session.document_count }} docs</span>
         </div>
+      {% if session.latest_batch_id %}
       </a>
+      {% else %}
+      </div>
+      {% endif %}
       {% endfor %}
     </div>
   </section>
