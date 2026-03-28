@@ -22,12 +22,31 @@ async def home(request: Request):
     persons = await db.list_persons()
     sessions = await db.list_sessions()
     setup_data = _read_setup()
+
+    # Enrich sessions with person name and latest batch id
+    persons_map = {p["id"]: p["display_name"] for p in persons}
+    enriched_sessions = []
+    for s in sessions:
+        batches = await db.list_batches(s["id"])
+        latest_batch = batches[0] if batches else None
+        docs = []
+        if latest_batch:
+            docs = await db.list_documents(latest_batch["id"])
+        enriched_sessions.append(
+            {
+                **s,
+                "person_name": persons_map.get(s["person_id"], "Unknown"),
+                "latest_batch_id": latest_batch["id"] if latest_batch else None,
+                "document_count": len(docs),
+            }
+        )
+
     return templates.TemplateResponse(
         request,
         "home.html",
         {
             "persons": persons,
-            "sessions": sessions,
+            "sessions": enriched_sessions,
             "setup_completed": setup_data.get("completed", False),
         },
     )
