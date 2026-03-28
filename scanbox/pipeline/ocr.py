@@ -4,12 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytesseract
 from pdf2image import convert_from_path
-
-try:
-    import pytesseract
-except ImportError:
-    pytesseract = None
 
 
 def extract_text_by_page(pdf_path: Path) -> dict[int, str]:
@@ -17,7 +13,7 @@ def extract_text_by_page(pdf_path: Path) -> dict[int, str]:
     images = convert_from_path(str(pdf_path), dpi=300)
     page_texts = {}
     for i, img in enumerate(images):
-        text = pytesseract.image_to_string(img) if pytesseract else ""
+        text = pytesseract.image_to_string(img)
         page_texts[i + 1] = text
     return page_texts
 
