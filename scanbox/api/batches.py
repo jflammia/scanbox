@@ -100,6 +100,19 @@ async def scan_backs(batch_id: str):
     }
 
 
+@router.get("/api/batches/{batch_id}/progress")
+async def batch_progress(batch_id: str):
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return {
+        "batch_id": batch_id,
+        "state": batch["state"],
+        "processing_stage": batch.get("processing_stage"),
+    }
+
+
 @router.post("/api/batches/{batch_id}/save")
 async def save_batch(batch_id: str):
     db = get_db()

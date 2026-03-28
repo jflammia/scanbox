@@ -1,0 +1,35 @@
+<div id="doc-{{ doc.id }}" class="border border-border rounded-lg p-4 bg-surface-raised space-y-2">
+  <div class="flex items-center justify-between">
+    <span class="font-semibold">{{ doc.document_type or 'Unknown' }}</span>
+    <span class="text-xs text-text-muted">pp. {{ doc.start_page }}–{{ doc.end_page }}</span>
+  </div>
+
+  {% if doc.date_of_service %}
+  <div class="text-sm text-text-secondary">{{ doc.date_of_service }}</div>
+  {% endif %}
+
+  {% if doc.facility %}
+  <div class="text-sm text-text-secondary">{{ doc.facility }}</div>
+  {% endif %}
+
+  {% if doc.provider %}
+  <div class="text-sm text-text-secondary">{{ doc.provider }}</div>
+  {% endif %}
+
+  {% if doc.description %}
+  <div class="text-sm text-text-muted">{{ doc.description }}</div>
+  {% endif %}
+
+  {% if doc.confidence is not none %}
+  <div class="text-xs text-text-muted">Confidence: {{ "%.0f"|format(doc.confidence * 100) }}%</div>
+  {% endif %}
+
+  <div class="flex gap-2 pt-2">
+    <button hx-get="/documents/{{ doc.id }}/edit"
+            hx-target="#doc-{{ doc.id }}"
+            hx-swap="outerHTML"
+            class="text-sm text-brand-600 font-medium hover:text-brand-700">
+      Edit
+    </button>
+  </div>
+</div>
