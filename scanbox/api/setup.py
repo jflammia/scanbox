@@ -80,6 +80,86 @@ async def setup_add_person(person_name: str = Form(...)):
     )
 
 
+@router.post("/api/setup/test-scanner")
+async def test_scanner():
+    """Test scanner connectivity by fetching its status."""
+    cfg = Config()
+    if not cfg.SCANNER_IP:
+        return {"success": False, "message": "No scanner IP configured. Set SCANNER_IP."}
+
+    from scanbox.scanner.escl import ESCLClient
+
+    client = ESCLClient(cfg.SCANNER_IP)
+    try:
+        caps = await client.get_capabilities()
+        return {
+            "success": True,
+            "scanner_ip": cfg.SCANNER_IP,
+            "model": caps.make_and_model or "Unknown model",
+            "message": "Scanner connected",
+        }
+    except Exception:
+        return {
+            "success": False,
+            "scanner_ip": cfg.SCANNER_IP,
+            "message": "Can't reach the scanner. Is it turned on?",
+        }
+    finally:
+        await client.close()
+
+
+@router.post("/api/setup/test-llm")
+async def test_llm():
+    """Test LLM provider connectivity with a simple completion request."""
+    cfg = Config()
+    model = cfg.llm_model_id()
+    try:
+        import litellm
+
+        await litellm.acompletion(
+            model=model,
+            messages=[{"role": "user", "content": "Reply with OK"}],
+            max_tokens=5,
+        )
+        return {
+            "success": True,
+            "provider": cfg.LLM_PROVIDER,
+            "model": model,
+            "message": "LLM provider connected",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "provider": cfg.LLM_PROVIDER,
+            "model": model,
+            "message": f"LLM connection failed: {e}",
+        }
+
+
+@router.post("/api/setup/test-paperless")
+async def test_paperless():
+    """Test PaperlessNGX connectivity."""
+    cfg = Config()
+    if not cfg.PAPERLESS_URL or not cfg.PAPERLESS_API_TOKEN:
+        return {"success": False, "message": "PaperlessNGX not configured."}
+
+    from scanbox.api.paperless import PaperlessClient
+
+    client = PaperlessClient(cfg.PAPERLESS_URL, cfg.PAPERLESS_API_TOKEN)
+    ok = await client.check_connection()
+    if ok:
+        return {
+            "success": True,
+            "paperless_url": cfg.PAPERLESS_URL,
+            "message": "Connected to PaperlessNGX",
+        }
+    return {
+        "success": False,
+        "paperless_url": cfg.PAPERLESS_URL,
+        "message": "Can't connect to PaperlessNGX. Check URL and API token.",
+    }
+
+
 @router.get("/setup")
 async def setup_page(request: Request):
     data = _read_setup()

@@ -2,10 +2,13 @@
 
 import asyncio
 from datetime import UTC, datetime
+from io import BytesIO
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from scanbox.api.scanning import (
+    _run_processing,
     process_after_skip_backs,
     scan_backs_task,
     scan_fronts_task,
@@ -248,4 +251,77 @@ async def save_batch(batch_id: str):
         "medical_records": medical_records,
         "paperless_ids": paperless_ids,
         "index_csv": str(index_csv_path),
+    }
+
+
+@router.get("/api/batches/{batch_id}/pages/{page_num}/thumbnail")
+async def page_thumbnail(batch_id: str, page_num: int):
+    """Get a JPEG thumbnail for a specific page in a batch (for boundary editor)."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    session = await db.get_session(batch["session_id"])
+    cfg = Config()
+    batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+    # Use the OCR'd PDF if available, else combined
+    pdf_path = batch_dir / "ocr.pdf"
+    if not pdf_path.exists():
+        pdf_path = batch_dir / "combined.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="No PDF available for this batch")
+
+    from pdf2image import convert_from_path
+
+    images = convert_from_path(str(pdf_path), first_page=page_num, last_page=page_num, dpi=150)
+    if not images:
+        raise HTTPException(status_code=404, detail=f"Page {page_num} not found")
+
+    img = images[0]
+    ratio = 300 / img.width
+    img = img.resize((300, int(img.height * ratio)))
+
+    buf = BytesIO()
+    img.save(buf, format="JPEG", quality=80)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/jpeg")
+
+
+@router.post("/api/batches/{batch_id}/reprocess", status_code=202)
+async def reprocess_batch(batch_id: str):
+    """Re-run the processing pipeline on existing scans."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    if batch["state"] not in ("review", "error"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot reprocess in state '{batch['state']}'. Must be 'review' or 'error'.",
+        )
+
+    session = await db.get_session(batch["session_id"])
+    cfg = Config()
+    batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+    # Must have source files
+    has_backs = (batch_dir / "backs.pdf").exists()
+    if not (batch_dir / "fronts.pdf").exists():
+        raise HTTPException(status_code=404, detail="Source scan files not found")
+
+    # Delete existing documents and state to force re-run
+    await db.delete_documents_by_batch(batch_id)
+    state_file = batch_dir / "state.json"
+    if state_file.exists():
+        state_file.unlink()
+
+    asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
+
+    return {
+        "status": "reprocessing",
+        "message": "Batch reprocessing started",
+        "progress_url": f"/api/batches/{batch_id}/progress",
     }

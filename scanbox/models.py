@@ -47,6 +47,7 @@ class SplitDocument(BaseModel):
     description: str = "Document"
     confidence: float = 1.0
     user_edited: bool = False
+    filename: str = ""
 
 
 class BatchInfo(BaseModel):
