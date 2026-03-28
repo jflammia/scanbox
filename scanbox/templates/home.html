@@ -4,6 +4,15 @@
 
 {% block content %}
 <section class="space-y-8">
+  {% if not setup_completed %}
+  <div class="bg-brand-50 border border-brand-200 rounded-lg p-4 text-center">
+    <p class="text-text-secondary">First time here?
+      <a href="/setup" class="text-brand-600 font-semibold hover:text-brand-700 no-underline">Run Setup</a>
+      to get started.
+    </p>
+  </div>
+  {% endif %}
+
   <div class="text-center space-y-4">
     <h1 class="text-3xl font-bold">Ready to scan</h1>
     <p class="text-lg text-text-secondary">Choose who you're scanning for, then start.</p>

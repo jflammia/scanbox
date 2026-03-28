@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
+from scanbox.api.setup import _read_setup
 from scanbox.config import Config
 from scanbox.main import get_db
 
@@ -19,8 +20,15 @@ async def home(request: Request):
     db = get_db()
     persons = await db.list_persons()
     sessions = await db.list_sessions()
+    setup_data = _read_setup()
     return templates.TemplateResponse(
-        request, "home.html", {"persons": persons, "sessions": sessions}
+        request,
+        "home.html",
+        {
+            "persons": persons,
+            "sessions": sessions,
+            "setup_completed": setup_data.get("completed", False),
+        },
     )
 
 

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Setup{% endblock %}
+
+{% block content %}
+<section class="max-w-lg mx-auto space-y-8 text-center" x-data="{ step: {{ current_step }} }">
+  <h1 class="text-3xl font-bold">Setup</h1>
+  <p class="text-text-secondary">Let's get ScanBox ready. This only takes a minute.</p>
+
+  <div class="flex justify-center gap-2 py-2">
+    {% for i in range(1, total_steps + 1) %}
+    <span class="w-3 h-3 rounded-full {{ 'bg-brand-600' if i <= current_step else 'bg-gray-300' }}"></span>
+    {% endfor %}
+  </div>
+
+  {# Step 1: Scanner Check #}
+  <div x-show="step === 1" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#128424;</div>
+    <h2 class="text-xl font-semibold">Looking for your scanner...</h2>
+    <p class="text-text-secondary">ScanBox will try to find a scanner on your network.</p>
+    <button @click="step = 2"
+            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+      Continue
+    </button>
+  </div>
+
+  {# Step 2: Storage Check #}
+  <div x-show="step === 2" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#128193;</div>
+    <h2 class="text-xl font-semibold">Checking storage...</h2>
+    <p class="text-text-secondary">Making sure we can save your files.</p>
+    <button @click="step = 3"
+            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+      Continue
+    </button>
+  </div>
+
+  {# Step 3: AI Setup #}
+  <div x-show="step === 3" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#129302;</div>
+    <h2 class="text-xl font-semibold">AI document analysis</h2>
+    <p class="text-text-secondary">Which AI service would you like to use for document analysis?</p>
+    <select class="w-full border border-border rounded-md px-4 py-3 text-base bg-white">
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="openai">OpenAI (GPT)</option>
+      <option value="ollama">Ollama (local)</option>
+    </select>
+    <button @click="step = 4"
+            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+      Continue
+    </button>
+  </div>
+
+  {# Step 4: PaperlessNGX (optional) #}
+  <div x-show="step === 4" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#128196;</div>
+    <h2 class="text-xl font-semibold">Do you use PaperlessNGX?</h2>
+    <p class="text-text-secondary">Optional integration for document management.</p>
+    <div class="flex justify-center gap-4">
+      <button @click="step = 5"
+              class="bg-brand-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+        Yes, set it up
+      </button>
+      <button @click="step = 5"
+              class="bg-transparent text-text-secondary px-6 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+        No, skip this
+      </button>
+    </div>
+  </div>
+
+  {# Step 5: Add a Person #}
+  <div x-show="step === 5" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#128100;</div>
+    <h2 class="text-xl font-semibold">Who are these documents for?</h2>
+    <p class="text-text-secondary">Enter the name of the person you'll be scanning records for.</p>
+    <input type="text" placeholder="e.g. John Doe"
+           class="w-full border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+    <button @click="step = 6"
+            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+      Continue
+    </button>
+  </div>
+
+  {# Step 6: Done #}
+  <div x-show="step === 6" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <div class="text-5xl">&#9989;</div>
+    <h2 class="text-xl font-semibold">You're ready to scan!</h2>
+    <p class="text-text-secondary">Everything is set up. Start your first scanning session.</p>
+    <a href="/"
+       hx-post="/api/setup/complete"
+       hx-swap="none"
+       class="inline-block bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors no-underline">
+      Start Scanning
+    </a>
+  </div>
+
+  <p class="text-sm text-text-muted">Step <span x-text="step"></span> of {{ total_steps }}</p>
+</section>
+{% endblock %}
