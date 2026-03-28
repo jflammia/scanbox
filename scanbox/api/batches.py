@@ -1,9 +1,15 @@
 """Batch management and scanning trigger endpoints."""
 
+import asyncio
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
+from scanbox.api.scanning import (
+    process_after_skip_backs,
+    scan_backs_task,
+    scan_fronts_task,
+)
 from scanbox.config import Config
 from scanbox.main import get_db
 from scanbox.pipeline.output import write_archive, write_medical_records
@@ -53,6 +59,7 @@ async def skip_backs(batch_id: str):
             detail=f"Cannot skip backs in state '{batch['state']}'. Must be 'fronts_done'.",
         )
     updated = await db.update_batch_state(batch_id, "backs_skipped")
+    asyncio.create_task(process_after_skip_backs(batch_id, db))
     return updated
 
 
@@ -73,6 +80,8 @@ async def scan_fronts(batch_id: str):
             status_code=409,
             detail=f"Cannot scan fronts in state '{batch['state']}'.",
         )
+
+    asyncio.create_task(scan_fronts_task(batch_id, db))
 
     return {
         "status": "scanning",
@@ -99,6 +108,8 @@ async def scan_backs(batch_id: str):
             detail=f"Cannot scan backs in state '{batch['state']}'.",
         )
 
+    asyncio.create_task(scan_backs_task(batch_id, db))
+
     return {
         "status": "scanning",
         "message": "Scanning back pages...",
@@ -118,6 +129,29 @@ async def batch_progress(batch_id: str):
         "state": batch["state"],
         "processing_stage": batch.get("processing_stage"),
     }
+
+
+@router.get("/api/batches/{batch_id}/progress/stream")
+async def batch_progress_stream(batch_id: str):
+    """SSE stream of real-time progress events for a batch."""
+    import json
+
+    from fastapi.responses import StreamingResponse
+
+    from scanbox.api.sse import event_bus
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    async def generate():
+        async for event in event_bus.subscribe(batch_id):
+            yield f"data: {json.dumps(event)}\n\n"
+            if event.get("type") in ("done", "error"):
+                break
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.post("/api/batches/{batch_id}/save")
