@@ -39,8 +39,8 @@
     <div class="text-center">
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
               hx-post="/api/practice/step/1/complete"
-              hx-target="closest section"
-              @htmx:after-request="step = 2">
+              hx-swap="none"
+              @htmx:after-request.camel="step = 2">
         Done — looks good
       </button>
     </div>
@@ -63,8 +63,8 @@
     <div class="text-center">
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
               hx-post="/api/practice/step/2/complete"
-              hx-target="closest section"
-              @htmx:after-request="step = 3">
+              hx-swap="none"
+              @htmx:after-request.camel="step = 3">
         Done — pages look correct
       </button>
     </div>
@@ -87,8 +87,8 @@
     <div class="text-center">
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
               hx-post="/api/practice/step/3/complete"
-              hx-target="closest section"
-              @htmx:after-request="step = 4">
+              hx-swap="none"
+              @htmx:after-request.camel="step = 4">
         Done — documents detected correctly
       </button>
     </div>
@@ -111,8 +111,8 @@
     <div class="text-center">
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
               hx-post="/api/practice/step/4/complete"
-              hx-target="closest section"
-              @htmx:after-request="completed = true">
+              hx-swap="none"
+              @htmx:after-request.camel="completed = true">
         Done — files saved correctly
       </button>
     </div>
