@@ -15,18 +15,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr-eng \
     ghostscript \
     poppler-utils \
-    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install Python dependencies first (cache layer)
+# Copy source and install
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-
-# Copy application code
 COPY scanbox/ scanbox/
 COPY static/ static/
+RUN pip install --no-cache-dir .
 
 # Create directories for volumes
 RUN mkdir -p /app/data /output
