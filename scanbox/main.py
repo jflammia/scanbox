@@ -3,7 +3,8 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from scanbox.config import Config
@@ -41,9 +42,31 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+# Paths that bypass API key auth
+_AUTH_EXEMPT = {"/api/health", "/api/openapi.json", "/api/docs", "/api/redoc"}
 
-@app.get("/api/health")
+
+@app.middleware("http")
+async def api_key_auth(request: Request, call_next):
+    """Optional bearer token auth for /api/ routes when SCANBOX_API_KEY is set."""
+    cfg = Config()
+    if (
+        cfg.SCANBOX_API_KEY
+        and request.url.path.startswith("/api/")
+        and request.url.path not in _AUTH_EXEMPT
+    ):
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {cfg.SCANBOX_API_KEY}":
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
+    return await call_next(request)
+
+
+@app.get("/api/health", tags=["system"])
 async def health():
+    """Check if the ScanBox service is running."""
     return {"status": "ok"}
 
 

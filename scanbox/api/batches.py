@@ -13,6 +13,7 @@ router = APIRouter(tags=["batches"])
 
 @router.post("/api/sessions/{session_id}/batches", status_code=201)
 async def create_batch(session_id: str):
+    """Create a new scan batch within a session."""
     db = get_db()
     session = await db.get_session(session_id)
     if not session:
@@ -23,6 +24,7 @@ async def create_batch(session_id: str):
 
 @router.get("/api/sessions/{session_id}/batches")
 async def list_batches(session_id: str):
+    """List all batches in a session."""
     db = get_db()
     batches = await db.list_batches(session_id)
     return {"items": batches}
@@ -30,6 +32,7 @@ async def list_batches(session_id: str):
 
 @router.get("/api/batches/{batch_id}")
 async def get_batch(batch_id: str):
+    """Get batch details and current state."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -39,6 +42,7 @@ async def get_batch(batch_id: str):
 
 @router.post("/api/batches/{batch_id}/skip-backs")
 async def skip_backs(batch_id: str):
+    """Skip back-side scanning for single-sided documents."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -54,6 +58,7 @@ async def skip_backs(batch_id: str):
 
 @router.post("/api/batches/{batch_id}/scan/fronts", status_code=202)
 async def scan_fronts(batch_id: str):
+    """Start scanning front sides via the ADF scanner."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -78,6 +83,7 @@ async def scan_fronts(batch_id: str):
 
 @router.post("/api/batches/{batch_id}/scan/backs", status_code=202)
 async def scan_backs(batch_id: str):
+    """Start scanning back sides via the ADF scanner."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -102,6 +108,7 @@ async def scan_backs(batch_id: str):
 
 @router.get("/api/batches/{batch_id}/progress")
 async def batch_progress(batch_id: str):
+    """Get the current processing progress for a batch."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -115,6 +122,7 @@ async def batch_progress(batch_id: str):
 
 @router.post("/api/batches/{batch_id}/save")
 async def save_batch(batch_id: str):
+    """Save batch documents to archive and medical records folders."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:

@@ -18,6 +18,7 @@ class UpdatePersonRequest(BaseModel):
 
 @router.get("")
 async def list_persons():
+    """List all person profiles."""
     db = get_db()
     persons = await db.list_persons()
     return {"items": persons}
@@ -25,6 +26,7 @@ async def list_persons():
 
 @router.post("", status_code=201)
 async def create_person(req: CreatePersonRequest):
+    """Create a new person profile."""
     db = get_db()
     person = await db.create_person(req.display_name)
     return person
@@ -32,6 +34,7 @@ async def create_person(req: CreatePersonRequest):
 
 @router.get("/{person_id}")
 async def get_person(person_id: str):
+    """Get a person profile by ID."""
     db = get_db()
     person = await db.get_person(person_id)
     if not person:
@@ -41,6 +44,7 @@ async def get_person(person_id: str):
 
 @router.put("/{person_id}")
 async def update_person(person_id: str, req: UpdatePersonRequest):
+    """Update a person's display name."""
     db = get_db()
     person = await db.get_person(person_id)
     if not person:
@@ -51,6 +55,7 @@ async def update_person(person_id: str, req: UpdatePersonRequest):
 
 @router.delete("/{person_id}", status_code=204)
 async def delete_person(person_id: str):
+    """Delete a person profile. Fails if the person has existing sessions."""
     db = get_db()
     person = await db.get_person(person_id)
     if not person:

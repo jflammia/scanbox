@@ -14,6 +14,7 @@ class CreateSessionRequest(BaseModel):
 
 @router.get("")
 async def list_sessions(person_id: str | None = Query(None)):
+    """List scanning sessions, optionally filtered by person."""
     db = get_db()
     sessions = await db.list_sessions(person_id=person_id)
     return {"items": sessions}
@@ -21,6 +22,7 @@ async def list_sessions(person_id: str | None = Query(None)):
 
 @router.post("", status_code=201)
 async def create_session(req: CreateSessionRequest):
+    """Start a new scanning session for a person."""
     db = get_db()
     person = await db.get_person(req.person_id)
     if not person:
@@ -31,6 +33,7 @@ async def create_session(req: CreateSessionRequest):
 
 @router.get("/{session_id}")
 async def get_session(session_id: str):
+    """Get a scanning session by ID."""
     db = get_db()
     session = await db.get_session(session_id)
     if not session:
