@@ -46,6 +46,7 @@ class CreateWebhookRequest(BaseModel):
 
 @router.post("/api/webhooks", status_code=201)
 async def create_webhook(req: CreateWebhookRequest):
+    """Register a new webhook to receive event notifications."""
     webhooks = _read_webhooks()
     webhook_id = uuid.uuid4().hex[:12]
     webhook = {
@@ -64,6 +65,7 @@ async def create_webhook(req: CreateWebhookRequest):
 
 @router.get("/api/webhooks")
 async def list_webhooks():
+    """List all registered webhooks."""
     webhooks = _read_webhooks()
     # Strip secrets from response
     items = [{"id": w["id"], "url": w["url"], "events": w["events"]} for w in webhooks]
@@ -72,6 +74,7 @@ async def list_webhooks():
 
 @router.delete("/api/webhooks/{webhook_id}", status_code=204)
 async def delete_webhook(webhook_id: str):
+    """Remove a registered webhook."""
     webhooks = _read_webhooks()
     original_count = len(webhooks)
     webhooks = [w for w in webhooks if w["id"] != webhook_id]
@@ -83,4 +86,5 @@ async def delete_webhook(webhook_id: str):
 
 @router.get("/api/webhooks/events")
 async def list_event_types():
+    """List available webhook event types."""
     return {"events": VALID_EVENTS}

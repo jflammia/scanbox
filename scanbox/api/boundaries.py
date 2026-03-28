@@ -20,6 +20,7 @@ class UpdateSplitsRequest(BaseModel):
 
 @router.get("/api/batches/{batch_id}/splits")
 async def get_splits(batch_id: str):
+    """Get current document split boundaries for a batch."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -42,6 +43,7 @@ async def get_splits(batch_id: str):
 
 @router.post("/api/batches/{batch_id}/splits")
 async def update_splits(batch_id: str, req: UpdateSplitsRequest):
+    """Replace document split boundaries and regenerate documents."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:

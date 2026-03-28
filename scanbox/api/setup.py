@@ -38,6 +38,7 @@ def _write_setup(data: dict) -> None:
 
 @router.get("/api/setup/status")
 async def setup_status():
+    """Get the current setup wizard status."""
     data = _read_setup()
     return {
         "completed": data.get("completed", False),
@@ -56,6 +57,7 @@ class SetupCompleteRequest(BaseModel):
 
 @router.post("/api/setup/complete")
 async def complete_setup(req: SetupCompleteRequest | None = None):
+    """Mark setup as complete and optionally save configuration."""
     data = _read_setup()
     data["completed"] = True
     data["current_step"] = TOTAL_STEPS
