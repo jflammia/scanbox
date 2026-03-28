@@ -46,8 +46,10 @@ async def health():
 
 
 # Import and include routers after app creation to avoid circular imports
+from scanbox.api.batches import router as batches_router  # noqa: E402
 from scanbox.api.persons import router as persons_router  # noqa: E402
 from scanbox.api.sessions import router as sessions_router  # noqa: E402
 
 app.include_router(persons_router)
 app.include_router(sessions_router)
+app.include_router(batches_router)
