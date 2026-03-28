@@ -4,6 +4,8 @@ import csv
 import shutil
 from pathlib import Path
 
+import pikepdf
+
 from scanbox.models import SplitDocument
 
 # Pluralized folder names for medical record categories
@@ -54,6 +56,26 @@ def write_medical_records(
     dest = dest_dir / filename
     shutil.copy2(doc_pdf, dest)
     return dest
+
+
+def embed_pdf_metadata(
+    pdf_path: Path,
+    title: str,
+    author: str,
+    subject: str,
+    creation_date: str,
+) -> None:
+    """Embed metadata into a PDF file's docinfo."""
+    pdf = pikepdf.Pdf.open(pdf_path)
+    with pdf.open_metadata() as meta:
+        meta["dc:title"] = title
+        meta["dc:creator"] = [author]
+        meta["dc:subject"] = [subject]
+        meta["xmp:CreatorTool"] = "ScanBox"
+    if creation_date and creation_date != "unknown":
+        pdf.docinfo["/CreationDate"] = f"D:{creation_date.replace('-', '')}000000"
+        pdf.docinfo["/Producer"] = "ScanBox"
+    pdf.save(pdf_path)
 
 
 def append_index_csv(
