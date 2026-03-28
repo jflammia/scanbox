@@ -27,6 +27,13 @@ async def lifespan(app: FastAPI):
     db_path = cfg.INTERNAL_DATA_DIR / "scanbox.db"
     _db = Database(db_path)
     await _db.init()
+
+    # Mount MCP server if enabled
+    if cfg.MCP_ENABLED:
+        from scanbox.mcp.server import mcp as mcp_server
+
+        app.mount("/mcp", mcp_server.streamable_http_app())
+
     yield
     await _db.close()
     _db = None
@@ -66,8 +73,59 @@ async def api_key_auth(request: Request, call_next):
 
 @app.get("/api/health", tags=["system"])
 async def health():
-    """Check if the ScanBox service is running."""
-    return {"status": "ok"}
+    """Check system health — API, database, scanner, LLM, and storage status."""
+    cfg = Config()
+    checks: dict = {"api": "ok"}
+
+    # Database
+    try:
+        db = get_db()
+        await db.list_persons()
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "error"
+
+    # Scanner
+    if cfg.SCANNER_IP:
+        try:
+            from scanbox.scanner.escl import ESCLClient
+
+            client = ESCLClient(cfg.SCANNER_IP)
+            try:
+                await client.get_status()
+                checks["scanner"] = "ok"
+            finally:
+                await client.close()
+        except Exception:
+            checks["scanner"] = "unreachable"
+    else:
+        checks["scanner"] = "not configured"
+
+    # Storage
+    checks["storage"] = {
+        "internal": "ok" if cfg.INTERNAL_DATA_DIR.exists() else "missing",
+        "output": "ok" if cfg.OUTPUT_DIR.exists() else "missing",
+    }
+
+    # LLM
+    checks["llm"] = {
+        "provider": cfg.LLM_PROVIDER,
+        "model": cfg.llm_model_id(),
+        "configured": bool(
+            cfg.ANTHROPIC_API_KEY or cfg.OPENAI_API_KEY or cfg.LLM_PROVIDER == "ollama"
+        ),
+    }
+
+    # PaperlessNGX
+    if cfg.PAPERLESS_URL:
+        checks["paperless"] = {"url": cfg.PAPERLESS_URL, "configured": True}
+    else:
+        checks["paperless"] = {"configured": False}
+
+    overall = "ok"
+    if checks["database"] != "ok":
+        overall = "degraded"
+    return {"status": overall, **checks}
 
 
 # Static files
@@ -80,6 +138,7 @@ from scanbox.api.boundaries import router as boundaries_router  # noqa: E402
 from scanbox.api.documents import router as documents_router  # noqa: E402
 from scanbox.api.persons import router as persons_router  # noqa: E402
 from scanbox.api.practice import router as practice_router  # noqa: E402
+from scanbox.api.scanner import router as scanner_router  # noqa: E402
 from scanbox.api.sessions import router as sessions_router  # noqa: E402
 from scanbox.api.setup import router as setup_router  # noqa: E402
 from scanbox.api.views import router as views_router  # noqa: E402
@@ -92,5 +151,6 @@ app.include_router(boundaries_router)
 app.include_router(documents_router)
 app.include_router(setup_router)
 app.include_router(practice_router)
+app.include_router(scanner_router)
 app.include_router(webhooks_router)
 app.include_router(views_router)
