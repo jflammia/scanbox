@@ -96,5 +96,6 @@ git push
 | 1 | `CLAUDE.md` | Project overview, architecture, conventions |
 | 2 | `docs/plans/2026-03-28-scanbox-implementation.md` | Task-by-task implementation with code |
 | 3 | `docs/design.md` | Authoritative spec for all behavior |
-| 4 | `.claude/rules/implementation-context.md` | Design decisions, gotchas, technical notes |
-| 5 | `pyproject.toml` | Dependencies and tool config |
+| 4 | `docs/ui-spec.md` | Visual design, components, layouts, accessibility |
+| 5 | `.claude/rules/implementation-context.md` | Design decisions, gotchas, technical notes |
+| 6 | `pyproject.toml` | Dependencies and tool config |

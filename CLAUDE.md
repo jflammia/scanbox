@@ -10,6 +10,7 @@ A self-hosted Docker web app that controls a network scanner via the eSCL protoc
 
 **This project is in early implementation.** The repo contains:
 - Design spec: `docs/design.md` (authoritative — read this before any implementation work)
+- UI spec: `docs/ui-spec.md` (visual design, components, screen layouts, interaction patterns)
 - Implementation plan: `docs/plans/2026-03-28-scanbox-implementation.md` (21 tasks, 3 phases)
 - Project scaffold: Dockerfile, docker-compose.yml, pyproject.toml, CI/CD workflows
 - Git workflow: hooks, quality gates, conventional commits (all configured)
