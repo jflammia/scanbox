@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+!.env.example
+
+# ScanBox runtime
+output/
+*.pdf
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Claude Code
+.claude/worktree-session
+.claude/settings.local.json

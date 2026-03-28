@@ -1,0 +1,38 @@
+[project]
+name = "scanbox"
+version = "0.0.1"
+description = "Self-contained medical document scanning, splitting, and archival pipeline"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "httpx>=0.28",
+    "pikepdf>=9",
+    "ocrmypdf>=16",
+    "Pillow>=11",
+    "pdf2image>=1.17",
+    "litellm>=1.55",
+    "python-multipart>=0.0.18",
+    "aiosqlite>=0.21",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "respx>=0.22",
+    "ruff>=0.8",
+    "httpx[http2]>=0.28",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

@@ -1,0 +1,13 @@
+services:
+  scanbox:
+    build: .
+    ports:
+      - "8090:8090"
+    env_file: .env
+    volumes:
+      - scanbox-data:/app/data
+      - ${OUTPUT_DIR:-./output}:/output
+    restart: unless-stopped
+
+volumes:
+  scanbox-data:
