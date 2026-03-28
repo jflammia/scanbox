@@ -18,16 +18,22 @@
     <p class="text-lg text-text-secondary">Choose who you're scanning for, then start.</p>
   </div>
 
-  <form action="/scan/start" method="post" class="space-y-4" x-data="{ personDropdownOpen: false }">
+  <form action="/scan/start" method="post" class="space-y-4" x-data="{ selectedPerson: '' }">
     <div>
       <label for="person_id" class="block text-sm font-medium mb-1">Scanning for</label>
-      <select name="person_id" id="person_id"
+      <select name="person_id" id="person_id" x-model="selectedPerson"
               class="w-full border border-border rounded-md px-4 py-3 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
         {% for person in persons %}
         <option value="{{ person.id }}">{{ person.display_name }}</option>
         {% endfor %}
         <option value="__new__">+ Add someone new</option>
       </select>
+    </div>
+    <div x-show="selectedPerson === '__new__'" x-transition>
+      <label for="new_person_name" class="block text-sm font-medium mb-1">Name</label>
+      <input type="text" name="new_person_name" id="new_person_name"
+             placeholder="Enter their full name"
+             class="w-full border border-border rounded-md px-4 py-3 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
     </div>
 
     <div class="text-center pt-2">

@@ -120,6 +120,69 @@ async def document_card(request: Request, document_id: str):
     return templates.TemplateResponse(request, "document_card.html", {"doc": doc})
 
 
+@router.get("/persons/list", response_class=HTMLResponse)
+async def persons_list(request: Request):
+    db = get_db()
+    persons = await db.list_persons()
+    return templates.TemplateResponse(request, "persons_list.html", {"persons": persons})
+
+
+@router.post("/persons/add", response_class=HTMLResponse)
+async def persons_add(request: Request, display_name: str = Form(...)):
+    db = get_db()
+    await db.create_person(display_name.strip())
+    persons = await db.list_persons()
+    return templates.TemplateResponse(request, "persons_list.html", {"persons": persons})
+
+
+@router.post("/batches/{batch_id}/save", response_class=HTMLResponse)
+async def save_batch_html(request: Request, batch_id: str):
+    from fastapi import HTTPException
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch["state"] != "review":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot save in state '{batch['state']}'. Must be 'review'.",
+        )
+
+    try:
+        from scanbox.api.batches import save_batch
+
+        result = await save_batch(batch_id)
+        count = len(result.get("medical_records", []))
+    except FileNotFoundError:
+        # Batch files may not exist yet (e.g. processing incomplete)
+        await db.update_batch_state(batch_id, "saved")
+        count = len(await db.list_documents(batch_id))
+
+    return templates.TemplateResponse(
+        request,
+        "save_result.html",
+        {"medical_records_count": count},
+    )
+
+
+@router.post("/batches/{batch_id}/skip-backs", response_class=HTMLResponse)
+async def skip_backs_html(request: Request, batch_id: str):
+    from fastapi import HTTPException
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if batch["state"] != "fronts_done":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot skip backs in state '{batch['state']}'.",
+        )
+    await db.update_batch_state(batch_id, "backs_skipped")
+    return HTMLResponse('<p class="text-status-success font-medium">Backs skipped</p>')
+
+
 @router.get("/settings")
 async def settings(request: Request):
     cfg = Config()

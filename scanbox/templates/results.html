@@ -41,14 +41,8 @@
         <p class="text-xs text-brand-600">Edited by you</p>
         {% endif %}
         <div class="flex gap-2 pt-2">
-          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
-                  hx-get="/api/documents/{{ doc.id }}"
-                  hx-target="#doc-{{ doc.id }}"
-                  hx-swap="outerHTML">
-            View
-          </button>
-          <button class="text-sm px-4 py-2 min-h-10 rounded-md {{ 'bg-status-warning text-white hover:bg-amber-600' if doc.confidence < 0.7 else 'bg-transparent text-text-secondary hover:bg-gray-100' }} transition-colors"
-                  hx-get="/api/documents/{{ doc.id }}"
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md {{ 'bg-status-warning text-white hover:bg-amber-600' if doc.confidence < 0.7 else 'bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50' }} transition-colors"
+                  hx-get="/documents/{{ doc.id }}/edit"
                   hx-target="#doc-{{ doc.id }}"
                   hx-swap="outerHTML">
             {{ "Fix This" if doc.confidence < 0.7 else "Edit" }}
@@ -64,7 +58,7 @@
   <div class="text-center space-y-3 pt-4">
     <p class="text-lg text-text-secondary">Everything look right?</p>
     <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
-            hx-post="/api/batches/{{ batch.id }}/save"
+            hx-post="/batches/{{ batch.id }}/save"
             hx-target="#save-result"
             hx-swap="innerHTML">
       Save
