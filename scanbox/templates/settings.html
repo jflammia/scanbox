@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Settings{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/" class="hover:text-text-primary no-underline">&larr; Home</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="space-y-8">
+  <h1 class="text-3xl font-bold">Settings</h1>
+
+  <div class="space-y-6">
+    <section class="bg-surface-raised border border-border rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">People</h2>
+      <div id="persons-list" class="space-y-3" hx-get="/api/persons" hx-trigger="load" hx-target="#persons-list" hx-swap="innerHTML">
+        <p class="text-text-muted">Loading...</p>
+      </div>
+      <div class="mt-4">
+        <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
+                x-data="{ showForm: false }"
+                @click="showForm = !showForm">
+          + Add person
+        </button>
+      </div>
+    </section>
+
+    <section class="bg-surface-raised border border-border rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Scanner</h2>
+      <p class="text-text-secondary">
+        {% if scanner_ip %}
+        Connected to scanner at <code class="font-mono text-sm">{{ scanner_ip }}</code>
+        {% else %}
+        No scanner configured. Set the <code class="font-mono text-sm">SCANNER_IP</code> environment variable.
+        {% endif %}
+      </p>
+    </section>
+
+    <section class="bg-surface-raised border border-border rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Integrations</h2>
+      <div class="space-y-2 text-text-secondary">
+        <p>
+          PaperlessNGX:
+          {% if paperless_url %}
+          <span class="text-status-success">Connected</span> &mdash; {{ paperless_url }}
+          {% else %}
+          <span class="text-text-muted">Not configured</span>
+          {% endif %}
+        </p>
+      </div>
+    </section>
+  </div>
+</section>
+{% endblock %}

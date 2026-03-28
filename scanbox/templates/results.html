@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Results{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/" class="hover:text-text-primary no-underline">&larr; Home</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="space-y-6">
+  <h1 class="text-3xl font-bold">
+    {{ documents | length }} document{{ "s" if documents | length != 1 else "" }} found
+    {% if batch %}in Batch {{ batch.batch_num }}{% endif %}
+  </h1>
+
+  {% block cards %}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for doc in documents %}
+    <article id="doc-{{ doc.id }}"
+             class="bg-surface-raised border rounded-lg overflow-hidden hover:shadow-md transition-shadow {{ 'border-status-warning border-2' if doc.confidence < 0.7 else 'border-border' }}">
+      <div class="aspect-[3/4] bg-gray-100 flex items-center justify-center text-text-muted relative">
+        <span class="text-4xl">&#128196;</span>
+        {% if doc.confidence < 0.7 %}
+        <span class="absolute top-2 right-2 bg-status-warning text-white text-xs font-bold px-2 py-1 rounded">Needs review</span>
+        {% endif %}
+      </div>
+      <div class="p-4 space-y-1">
+        <h3 class="text-lg font-semibold">{{ doc.document_type }}</h3>
+        <p class="text-sm {% if doc.date_of_service == 'unknown' %}text-status-warning{% else %}text-text-secondary{% endif %}">
+          {{ doc.date_of_service if doc.date_of_service != 'unknown' else 'Date unknown' }}
+        </p>
+        {% if doc.facility and doc.facility != 'unknown' %}
+        <p class="text-sm text-text-secondary">{{ doc.facility }}</p>
+        {% endif %}
+        {% if doc.description and doc.description != 'Document' %}
+        <p class="text-sm text-text-muted truncate">{{ doc.description }}</p>
+        {% endif %}
+        {% if doc.user_edited %}
+        <p class="text-xs text-brand-600">Edited by you</p>
+        {% endif %}
+        <div class="flex gap-2 pt-2">
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
+                  hx-get="/api/documents/{{ doc.id }}"
+                  hx-target="#doc-{{ doc.id }}"
+                  hx-swap="outerHTML">
+            View
+          </button>
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md {{ 'bg-status-warning text-white hover:bg-amber-600' if doc.confidence < 0.7 else 'bg-transparent text-text-secondary hover:bg-gray-100' }} transition-colors"
+                  hx-get="/api/documents/{{ doc.id }}"
+                  hx-target="#doc-{{ doc.id }}"
+                  hx-swap="outerHTML">
+            {{ "Fix This" if doc.confidence < 0.7 else "Edit" }}
+          </button>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endblock %}
+
+  {% block actions %}
+  <div class="text-center space-y-3 pt-4">
+    <p class="text-lg text-text-secondary">Everything look right?</p>
+    <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
+            hx-post="/api/batches/{{ batch.id }}/save"
+            hx-target="#save-result"
+            hx-swap="innerHTML">
+      Save
+    </button>
+    <div id="save-result" aria-live="polite"></div>
+    <p class="text-sm text-text-muted">
+      Need to fix something? Tap "Edit" or "Fix This" on any document above.
+    </p>
+  </div>
+  {% endblock %}
+</section>
+{% endblock %}
