@@ -4,7 +4,6 @@ Coordinates the eSCL scanner, pipeline runner, and database
 to perform the full scan-to-documents workflow.
 """
 
-import asyncio
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
@@ -138,19 +137,17 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
         has_backs=has_backs,
     )
 
-    def on_progress(stage_name: str, detail: str = ""):
-        asyncio.get_event_loop().call_soon_threadsafe(
-            asyncio.ensure_future,
-            event_bus.publish(
-                batch_id,
-                {"type": "progress", "stage": stage_name, "detail": detail},
-            ),
+    async def on_progress(stage_name: str, detail: str = ""):
+        await event_bus.publish(
+            batch_id,
+            {"type": "progress", "stage": stage_name, "detail": detail},
         )
 
     documents: list[SplitDocument] = await run_pipeline(ctx, on_progress=on_progress)
 
-    # Create document records in DB
+    # Create document records in DB using actual filenames from the pipeline
     for doc in documents:
+        filename = doc.filename or f"{doc.document_type}_{doc.start_page}-{doc.end_page}.pdf"
         await db.create_document(
             batch_id=batch_id,
             start_page=doc.start_page,
@@ -161,7 +158,7 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
             provider=doc.provider,
             description=doc.description,
             confidence=doc.confidence,
-            filename=f"{doc.document_type}_{doc.start_page}-{doc.end_page}.pdf",
+            filename=filename,
         )
 
     await db.update_batch_state(batch_id, "review")

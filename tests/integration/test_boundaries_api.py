@@ -46,26 +46,26 @@ async def batch_in_review(client: AsyncClient):
     return {"person": person, "session": session, "batch": batch}
 
 
-class TestGetSplits:
+class TestGetBoundaries:
     async def test_get_current_splits(self, batch_in_review, client: AsyncClient):
         batch_id = batch_in_review["batch"]["id"]
-        resp = await client.get(f"/api/batches/{batch_id}/splits")
+        resp = await client.get(f"/api/batches/{batch_id}/boundaries")
         assert resp.status_code == 200
         data = resp.json()
-        assert "splits" in data
-        assert len(data["splits"]) == 2
-        assert data["splits"][0]["start_page"] == 1
-        assert data["splits"][0]["end_page"] == 3
-        assert data["splits"][1]["start_page"] == 4
-        assert data["splits"][1]["end_page"] == 5
+        assert "boundaries" in data
+        assert len(data["boundaries"]) == 2
+        assert data["boundaries"][0]["start_page"] == 1
+        assert data["boundaries"][0]["end_page"] == 3
+        assert data["boundaries"][1]["start_page"] == 4
+        assert data["boundaries"][1]["end_page"] == 5
         assert data["total_pages"] == 5
 
     async def test_get_splits_nonexistent_batch(self, client: AsyncClient):
-        resp = await client.get("/api/batches/nonexistent/splits")
+        resp = await client.get("/api/batches/nonexistent/boundaries")
         assert resp.status_code == 404
 
 
-class TestUpdateSplits:
+class TestUpdateBoundaries:
     async def test_update_splits(self, batch_in_review, client: AsyncClient):
         batch_id = batch_in_review["batch"]["id"]
         new_splits = [
@@ -73,7 +73,9 @@ class TestUpdateSplits:
             {"start_page": 3, "end_page": 4},
             {"start_page": 5, "end_page": 5},
         ]
-        resp = await client.post(f"/api/batches/{batch_id}/splits", json={"splits": new_splits})
+        resp = await client.put(
+            f"/api/batches/{batch_id}/boundaries", json={"boundaries": new_splits}
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["documents"]) == 3
@@ -82,9 +84,9 @@ class TestUpdateSplits:
         person = (await client.post("/api/persons", json={"display_name": "X"})).json()
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
-        resp = await client.post(
-            f"/api/batches/{batch['id']}/splits",
-            json={"splits": [{"start_page": 1, "end_page": 1}]},
+        resp = await client.put(
+            f"/api/batches/{batch['id']}/boundaries",
+            json={"boundaries": [{"start_page": 1, "end_page": 1}]},
         )
         assert resp.status_code == 409
 
@@ -94,7 +96,9 @@ class TestUpdateSplits:
             {"start_page": 1, "end_page": 1},
             {"start_page": 2, "end_page": 5},
         ]
-        resp = await client.post(f"/api/batches/{batch_id}/splits", json={"splits": new_splits})
+        resp = await client.put(
+            f"/api/batches/{batch_id}/boundaries", json={"boundaries": new_splits}
+        )
         assert resp.status_code == 200
 
         # Verify documents were recreated

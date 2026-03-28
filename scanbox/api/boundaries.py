@@ -14,12 +14,12 @@ class SplitRange(BaseModel):
     end_page: int
 
 
-class UpdateSplitsRequest(BaseModel):
-    splits: list[SplitRange]
+class UpdateBoundariesRequest(BaseModel):
+    boundaries: list[SplitRange]
 
 
-@router.get("/api/batches/{batch_id}/splits")
-async def get_splits(batch_id: str):
+@router.get("/api/batches/{batch_id}/boundaries")
+async def get_boundaries(batch_id: str):
     """Get current document split boundaries for a batch."""
     db = get_db()
     batch = await db.get_batch(batch_id)
@@ -29,7 +29,7 @@ async def get_splits(batch_id: str):
     documents = await db.list_documents(batch_id)
     total_pages = max((d["end_page"] for d in documents), default=0)
 
-    splits = [
+    boundaries = [
         {
             "start_page": d["start_page"],
             "end_page": d["end_page"],
@@ -38,11 +38,11 @@ async def get_splits(batch_id: str):
         }
         for d in documents
     ]
-    return {"splits": splits, "total_pages": total_pages}
+    return {"boundaries": boundaries, "total_pages": total_pages}
 
 
-@router.post("/api/batches/{batch_id}/splits")
-async def update_splits(batch_id: str, req: UpdateSplitsRequest):
+@router.put("/api/batches/{batch_id}/boundaries")
+async def update_boundaries(batch_id: str, req: UpdateBoundariesRequest):
     """Replace document split boundaries and regenerate documents."""
     db = get_db()
     batch = await db.get_batch(batch_id)
@@ -64,7 +64,7 @@ async def update_splits(batch_id: str, req: UpdateSplitsRequest):
     await db.delete_documents_by_batch(batch_id)
 
     new_docs = []
-    for split in req.splits:
+    for split in req.boundaries:
         filename = generate_filename(
             person_name=person_name,
             document_type="Other",

@@ -212,4 +212,7 @@ class TestFullWorkflow:
         """Health check returns ok."""
         resp = await client.get("/api/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        data = resp.json()
+        assert data["status"] in ("ok", "degraded")
+        assert data["api"] == "ok"
+        assert data["database"] == "ok"

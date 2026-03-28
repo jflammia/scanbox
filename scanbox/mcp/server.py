@@ -179,13 +179,32 @@ async def scanbox_update_document(
 
 
 @mcp.tool()
-async def scanbox_adjust_boundaries(batch_id: str, splits: list[dict]) -> dict:
-    """Adjust document boundaries. Each split has start_page and end_page."""
+async def scanbox_adjust_boundaries(batch_id: str, boundaries: list[dict]) -> dict:
+    """Adjust document boundaries. Each boundary has start_page and end_page."""
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            f"{_base_url()}/api/batches/{batch_id}/splits",
-            json={"splits": splits},
+        resp = await client.put(
+            f"{_base_url()}/api/batches/{batch_id}/boundaries",
+            json={"boundaries": boundaries},
         )
+        return resp.json()
+
+
+# --- Pipeline Status ---
+
+
+@mcp.tool()
+async def scanbox_get_pipeline_status(batch_id: str) -> dict:
+    """Get the current processing stage and progress for a batch."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/progress")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_reprocess_batch(batch_id: str) -> dict:
+    """Re-run the processing pipeline on a batch's existing scans."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{_base_url()}/api/batches/{batch_id}/reprocess")
         return resp.json()
 
 
