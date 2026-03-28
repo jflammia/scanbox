@@ -53,6 +53,7 @@ app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # Import and include routers after app creation to avoid circular imports
 from scanbox.api.batches import router as batches_router  # noqa: E402
+from scanbox.api.boundaries import router as boundaries_router  # noqa: E402
 from scanbox.api.documents import router as documents_router  # noqa: E402
 from scanbox.api.persons import router as persons_router  # noqa: E402
 from scanbox.api.practice import router as practice_router  # noqa: E402
@@ -63,6 +64,7 @@ from scanbox.api.views import router as views_router  # noqa: E402
 app.include_router(persons_router)
 app.include_router(sessions_router)
 app.include_router(batches_router)
+app.include_router(boundaries_router)
 app.include_router(documents_router)
 app.include_router(setup_router)
 app.include_router(practice_router)
