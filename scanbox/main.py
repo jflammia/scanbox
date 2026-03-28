@@ -55,12 +55,12 @@ async def api_key_auth(request: Request, call_next):
         and request.url.path.startswith("/api/")
         and request.url.path not in _AUTH_EXEMPT
     ):
-            auth = request.headers.get("Authorization", "")
-            if auth != f"Bearer {cfg.SCANBOX_API_KEY}":
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "Invalid or missing API key"},
-                )
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {cfg.SCANBOX_API_KEY}":
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Invalid or missing API key"},
+            )
     return await call_next(request)
 
 
