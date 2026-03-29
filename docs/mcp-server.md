@@ -119,11 +119,12 @@ Get the current scanner status with a human-readable message.
 
 ```json
 {
-  "status": "idle",
-  "adf_loaded": true,
-  "message": "Scanner ready — paper loaded in ADF"
+  "scanner_ip": "192.168.1.100",
+  "message": "Scanner configured"
 }
 ```
+
+Returns `"not configured"` for `scanner_ip` if `SCANNER_IP` is not set.
 
 ---
 
