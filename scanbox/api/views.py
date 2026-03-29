@@ -274,3 +274,27 @@ async def settings(request: Request):
             "paperless_url": cfg.PAPERLESS_URL,
         },
     )
+
+
+@router.post("/settings/scanner", response_class=HTMLResponse)
+async def settings_scanner(scanner_ip: str = Form("")):
+    """Save scanner IP from the Settings page."""
+    import json
+
+    cfg = Config()
+    runtime_path = cfg.config_dir / "runtime.json"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Read existing runtime config, update scanner_ip
+    import contextlib
+
+    data = {}
+    if runtime_path.exists():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            data = json.loads(runtime_path.read_text())
+    data["scanner_ip"] = scanner_ip.strip()
+    runtime_path.write_text(json.dumps(data))
+
+    if scanner_ip.strip():
+        return HTMLResponse('<p class="text-status-success font-medium mt-2">Scanner IP saved.</p>')
+    return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')

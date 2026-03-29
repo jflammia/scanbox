@@ -674,8 +674,8 @@ class TestSettingsPage:
         monkeypatch.setenv("SCANNER_IP", "")
         resp = await client.get("/settings")
         assert "Scanner" in resp.text
-        assert "No scanner configured" in resp.text
-        assert "SCANNER_IP" in resp.text
+        assert 'name="scanner_ip"' in resp.text
+        assert 'hx-post="/settings/scanner"' in resp.text
 
     async def test_scanner_section_with_ip(self, client: AsyncClient, monkeypatch):
         monkeypatch.setenv("SCANNER_IP", "10.0.0.5")

@@ -25,11 +25,12 @@ COPY scanbox/ scanbox/
 COPY static/ static/
 RUN pip install --no-cache-dir .
 
-# Create directories for volumes
-RUN mkdir -p /app/data /output
-
 # Run as non-root
 RUN useradd --create-home scanbox
+
+# Create directories for volumes and set ownership
+RUN mkdir -p /app/data /output && chown scanbox:scanbox /app/data /output
+
 USER scanbox
 
 ENV PYTHONUNBUFFERED=1
