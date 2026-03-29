@@ -741,7 +741,7 @@ class TestSetupPage:
     async def test_step1_scanner_check(self, client: AsyncClient):
         resp = await client.get("/setup")
         assert "Find your scanner" in resp.text
-        assert 'name="scanner_ip"' in resp.text
+        assert "verify-scanner" in resp.text
         assert "discover-scanners" in resp.text
 
     async def test_step2_storage_check(self, client: AsyncClient):

@@ -23,33 +23,43 @@
     <div id="scanner-discover-result"
          hx-post="/setup/discover-scanners"
          hx-trigger="load"
-         hx-swap="innerHTML"
-         hx-indicator="#scanner-spinner">
-      <div id="scanner-spinner" class="flex justify-center gap-2 items-center text-text-muted">
+         hx-swap="innerHTML">
+      <div class="flex justify-center gap-2 items-center text-text-muted">
         <div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></div>
         Scanning your network...
       </div>
     </div>
 
-    {# Manual entry + test form #}
-    <form hx-post="/setup/test-scanner" hx-target="#scanner-test-result" hx-swap="innerHTML"
-          @htmx:after-request.camel="setTimeout(() => step = 2, 1500)"
+    <button type="button"
+            hx-post="/setup/discover-scanners"
+            hx-target="#scanner-discover-result"
+            hx-swap="innerHTML"
+            class="text-sm text-brand-600 hover:text-brand-700 no-underline cursor-pointer">
+      Rescan Network
+    </button>
+
+    {# Manual entry + verify form #}
+    <form x-ref="verifyForm"
+          hx-post="/setup/verify-scanner"
+          hx-target="#scanner-verify-result"
+          hx-swap="innerHTML"
           class="space-y-3">
       <label class="block text-sm text-text-secondary text-left">Or enter an IP address</label>
-      <input type="text" name="scanner_ip" x-ref="scannerIp" placeholder="e.g. 192.168.1.100"
-             class="w-full border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
-      <div id="scanner-test-result"></div>
-      <div class="flex justify-center gap-3">
+      <div class="flex gap-2">
+        <input type="text" name="scanner_ip" x-ref="scannerIp" placeholder="e.g. 192.168.1.100"
+               class="flex-1 border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
         <button type="submit"
-                class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
-          Test Connection
-        </button>
-        <button type="button" @click="step = 2"
-                class="bg-transparent text-text-secondary text-lg px-8 py-4 min-h-14 rounded-lg hover:bg-gray-100 transition-colors">
-          Skip for now
+                class="px-6 py-3 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors">
+          Verify
         </button>
       </div>
+      <div id="scanner-verify-result"></div>
     </form>
+
+    <button type="button" @click="step = 2"
+            class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+      Skip for now &rarr;
+    </button>
   </div>
 
   {# Step 2: Storage Check #}
