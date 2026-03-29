@@ -66,7 +66,7 @@ def embed_pdf_metadata(
     creation_date: str,
 ) -> None:
     """Embed metadata into a PDF file's docinfo."""
-    pdf = pikepdf.Pdf.open(pdf_path)
+    pdf = pikepdf.Pdf.open(pdf_path, allow_overwriting_input=True)
     with pdf.open_metadata() as meta:
         meta["dc:title"] = title
         meta["dc:creator"] = [author]
