@@ -80,6 +80,113 @@ async def setup_add_person(person_name: str = Form(...)):
     )
 
 
+@router.post("/setup/discover-scanners", response_class=HTMLResponse)
+async def discover_scanners():
+    """Scan common subnets for eSCL scanners and return HTML results."""
+    import asyncio
+    import xml.etree.ElementTree as ET
+
+    import httpx
+
+    found: list[dict] = []
+    sem = asyncio.Semaphore(100)
+
+    async def probe(ip: str, client: httpx.AsyncClient):
+        async with sem:
+            try:
+                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=1.5)
+                if resp.status_code == 200:
+                    # Try to get the model name from ScannerCapabilities
+                    name = ip
+                    try:
+                        caps = await client.get(
+                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=1.5
+                        )
+                        if caps.status_code == 200:
+                            root = ET.fromstring(caps.text)
+                            for el in root.iter():
+                                if el.tag.endswith("MakeAndModel") and el.text:
+                                    name = el.text
+                                    break
+                    except Exception:
+                        pass
+                    found.append({"ip": ip, "name": name})
+            except Exception:
+                pass
+
+    # Probe common home network subnets
+    subnets = ["192.168.1", "192.168.0", "192.168.10", "192.168.2", "10.0.0", "10.0.1"]
+    ips = [f"{subnet}.{host}" for subnet in subnets for host in range(1, 255)]
+
+    async with httpx.AsyncClient() as client:
+        await asyncio.gather(*(probe(ip, client) for ip in ips))
+
+    if found:
+        cards = ""
+        for s in found:
+            cards += (
+                f'<button type="button" '
+                f"@click=\"$refs.scannerIp.value = '{s['ip']}'; "
+                f"$el.closest('form').requestSubmit()\" "
+                f'class="w-full text-left border border-border rounded-lg p-4 '
+                f'hover:border-brand-400 hover:bg-brand-50 transition-colors cursor-pointer">'
+                f'<p class="font-semibold">{s["name"]}</p>'
+                f'<p class="text-sm text-text-secondary">{s["ip"]}</p>'
+                f"</button>"
+            )
+        return HTMLResponse(
+            f'<div class="space-y-2">'
+            f'<p class="text-status-success font-medium">Found {len(found)} scanner(s)</p>'
+            f"{cards}</div>"
+        )
+    return HTMLResponse(
+        '<p class="text-text-muted">No scanners found automatically. '
+        "Enter the IP address below.</p>"
+    )
+
+
+@router.post("/setup/test-scanner", response_class=HTMLResponse)
+async def setup_test_scanner(scanner_ip: str = Form("")):
+    """Save scanner IP and test connectivity, returning HTML feedback."""
+    import contextlib
+
+    scanner_ip = scanner_ip.strip()
+    if not scanner_ip:
+        return HTMLResponse(
+            '<p class="text-status-warning font-medium">'
+            "No IP entered. You can set this later in Settings.</p>"
+        )
+
+    # Save to runtime config
+    cfg = Config()
+    runtime_path = cfg.config_dir / "runtime.json"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    if runtime_path.exists():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            data = json.loads(runtime_path.read_text())
+    data["scanner_ip"] = scanner_ip
+    runtime_path.write_text(json.dumps(data))
+
+    # Test connectivity
+    from scanbox.scanner.escl import ESCLClient
+
+    client = ESCLClient(scanner_ip)
+    try:
+        caps = await client.get_capabilities()
+        model = caps.make_and_model or "Scanner"
+        return HTMLResponse(
+            f'<p class="text-status-success font-medium">Connected to {model} at {scanner_ip}</p>'
+        )
+    except Exception:
+        return HTMLResponse(
+            f'<p class="text-status-warning font-medium">'
+            f"Saved {scanner_ip} but can't reach it yet. Is the scanner on?</p>"
+        )
+    finally:
+        await client.close()
+
+
 @router.post("/api/setup/test-scanner")
 async def test_scanner():
     """Test scanner connectivity by fetching its status."""
