@@ -1,187 +1,204 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in this repository.
+Development guide for AI agents working on ScanBox.
 
-## What Is ScanBox?
+## Project Overview
 
-A self-hosted Docker application with an **API-first architecture** that controls a network scanner via the eSCL protocol, processes scans through an automated pipeline (interleave duplex pages, remove blanks, OCR, AI document splitting), and outputs professionally named medical records.
+ScanBox is a **fully implemented** self-hosted Docker application that controls a network scanner via eSCL, processes scans through an automated pipeline, and outputs professionally named documents. 532 tests, 94% coverage, all three phases complete.
 
-**Three interfaces, one engine:**
-- **REST API** — primary interface; the web UI and all integrations are consumers of this API
-- **MCP Server** — Model Context Protocol for native AI agent integration (Claude, etc.)
-- **Web UI** — human-friendly interface built on htmx + Alpine.js, consuming the API
+**Three interfaces, one backend:**
+- **REST API** (`/api/*`) — primary interface with OpenAPI docs at `/api/docs`
+- **MCP Server** (`/mcp`) — 20 tools for AI agent integration, enabled via `MCP_ENABLED=true`
+- **Web UI** (`/`) — htmx + Alpine.js wizard-guided workflow
 
-The target user is non-technical — the web UI must be dead-simple. But the API and MCP server make ScanBox equally accessible to AI agents, scripts, and automation workflows.
+## Source Layout
 
-## Current State
-
-**This project is in early implementation.** The repo contains:
-- Design spec: `docs/design.md` (authoritative — read this before any implementation work)
-- API spec: `docs/api-spec.md` (REST API reference for all endpoints)
-- MCP spec: `docs/mcp-server.md` (MCP server tools, resources, and prompts)
-- UI spec: `docs/ui-spec.md` (visual design, components, screen layouts, interaction patterns)
-- Implementation plan: `docs/plans/2026-03-28-scanbox-implementation.md` (21+ tasks, 3 phases)
-- Project scaffold: Dockerfile, docker-compose.yml, pyproject.toml, CI/CD workflows
-- Git workflow: hooks, quality gates, conventional commits (all configured)
-- No application code yet (just `scanbox/__init__.py` placeholder)
-
-**Start here:** Read the implementation plan, then execute tasks in order.
-
-## Operating Principles
-
-Non-negotiable. Follow even when the user doesn't ask:
-
-- **Never work around failures.** Diagnose and fix the root cause.
-- **Never add AI attribution.** No `Co-Authored-By`, `Signed-off-by`, or similar trailers.
-- **Always run `ruff format` before committing.** Pre-commit hook blocks unformatted code.
-- **Verify CI after pushing.** Check CI status — if red, fix immediately.
-- **TDD.** Write failing tests first, then implement. Every task in the plan follows this pattern.
-- **Read the design spec.** When the plan says "see design spec," read `docs/design.md` for the authoritative behavior. Don't guess.
+```
+scanbox/
+├── config.py              # Env var config with defaults
+├── models.py              # Pydantic: BatchState, SplitDocument, Person
+├── database.py            # SQLite via aiosqlite
+├── main.py                # FastAPI app, lifespan, health, MCP mount
+├── scanner/
+│   ├── escl.py            # eSCL HTTP client (capabilities, status, scan jobs)
+│   └── models.py          # ScannerStatus, ScannerCapabilities
+├── pipeline/
+│   ├── interleave.py      # Merge front/back PDFs
+│   ├── blank_detect.py    # Remove blank pages (Pillow, 1% threshold)
+│   ├── ocr.py             # OCR via ocrmypdf subprocess
+│   ├── splitter.py        # AI document splitting via litellm
+│   ├── namer.py           # Professional filename generation
+│   ├── output.py          # PDF splitting, metadata, Index.csv
+│   └── runner.py          # Pipeline orchestration with checkpointing
+├── api/
+│   ├── persons.py         # CRUD for people
+│   ├── sessions.py        # Session management
+│   ├── scanning.py        # Background scan tasks (fronts, backs, processing)
+│   ├── batches.py         # Batch status, reprocess, page thumbnails
+│   ├── documents.py       # Document CRUD, PDF/thumbnail/text serving
+│   ├── boundaries.py      # Document boundary editor
+│   ├── setup.py           # First-run wizard (test scanner/LLM/Paperless)
+│   ├── practice.py        # Practice run wizard
+│   ├── scanner.py         # Scanner status/capabilities API
+│   ├── sse.py             # EventBus for SSE progress streaming
+│   ├── paperless.py       # PaperlessNGX client
+│   ├── webhooks.py        # Webhook registration and dispatch
+│   └── views.py           # HTML template routes
+├── mcp/
+│   └── server.py          # 17 MCP tools, 2 resources, 2 prompts
+└── templates/             # Jinja2 + jinja2-fragments
+```
 
 ## Commands
 
 ```bash
-# First-time setup
+# Setup
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-bash .githooks/setup.sh              # Git hooks + rebase config
-brew install tesseract poppler ghostscript  # macOS system deps
-python -m tests.generate_fixtures    # Generate test PDFs
+bash .githooks/setup.sh
+python -m tests.generate_fixtures
 
 # Test
-pytest                                # All tests
-pytest tests/unit/ -v                 # Unit tests
-pytest tests/integration/ -v          # Integration tests
-pytest -k "interleave"               # Pattern match
+pytest                          # all 532 tests
+pytest tests/unit/ -v           # unit tests only
+pytest tests/integration/ -v    # integration tests
+pytest -k "pattern"             # filter
+
+# Coverage
+coverage run --source=scanbox -m pytest
+coverage report                 # CI requires >= 85%
 
 # Lint
-ruff format scanbox/ tests/          # Auto-format
-ruff check scanbox/ tests/           # Check style (line-length=100)
+ruff format scanbox/ tests/
+ruff check scanbox/ tests/      # line-length=100
 
 # Run
-docker compose up                     # http://localhost:8090
+docker compose up               # http://localhost:8090
+
+# System deps (macOS)
+brew install tesseract poppler ghostscript
 ```
 
-## Architecture
+## Principles
 
-```
-     Consumers (any can drive ScanBox)
-┌──────────┬──────────┬──────────┐
-│  Web UI  │ AI Agent │ Scripts  │
-│ (browser)│ (MCP/API)│ (curl)   │
-└────┬─────┴────┬─────┴────┬─────┘
-     │          │          │
-     ▼          ▼          ▼
-┌─────────────────────────────────┐
-│  FastAPI Backend (API-first)    │
-│  REST API · MCP Server · SSE   │
-│  Webhooks · OpenAPI docs        │
-├─────────────────────────────────┤
-│  Processing Pipeline            │
-│  Interleave → Blank Removal     │
-│  → OCR → AI Split → Name → Save│
-└─────────────────────────────────┘
-     │          │          │
-     ▼          ▼          ▼
-  Scanner   Output Dir  PaperlessNGX
-  (eSCL)    (volume)    (optional)
-```
+Non-negotiable. Follow even when not asked:
 
-### Source Layout
-
-| Directory | Responsibility |
-|-----------|---------------|
-| `scanbox/config.py` | Environment variable config with defaults |
-| `scanbox/models.py` | Shared Pydantic models (BatchState, SplitDocument, Person) |
-| `scanbox/database.py` | SQLite via aiosqlite (sessions, batches, documents, persons) |
-| `scanbox/scanner/` | eSCL protocol: capabilities, status, start job, get pages |
-| `scanbox/pipeline/` | Processing stages: interleave, blank_detect, ocr, splitter, namer, output, runner |
-| `scanbox/api/` | FastAPI routes: persons, sessions, scanning, batches, documents, setup, SSE, webhooks |
-| `scanbox/mcp/` | MCP server: tools, resources, prompts for AI agent integration |
-| `scanbox/templates/` | Jinja2 HTML: home, scan wizard, results cards, setup, practice run, settings |
-| `static/` | Tailwind CSS, Alpine.js, icons |
-| `tests/` | Unit, integration, E2E tests + fixture generator |
-
-### Key Technical Details
-
-- **API-first**: REST API at `/api/*` is the primary interface. OpenAPI spec at `/api/openapi.json`. Interactive docs at `/api/docs`. Web UI consumes the same API.
-- **MCP server**: Enable with `MCP_ENABLED=true`. Exposes tools for scanning, reviewing, and saving. See `docs/mcp-server.md`.
-- **Webhooks**: Register URLs to receive `scan.completed`, `processing.completed`, `save.completed` events. See `docs/api-spec.md`.
-- **eSCL protocol**: HTTP REST + XML. Endpoints: `/eSCL/ScannerCapabilities`, `/eSCL/ScannerStatus`, `/eSCL/ScanJobs` (POST to start, GET NextDocument in loop, DELETE to cancel). See `docs/design.md` "Scanner Communication" section.
-- **Pipeline checkpointing**: Each stage writes output to disk before the next begins. `state.json` in each batch dir tracks progress. On crash, pipeline resumes from last completed stage.
-- **Batch state machine**: `scanning_fronts → fronts_done → scanning_backs → backs_done → processing → review → saved`. See `docs/design.md` "Persistence & Progress" section.
-- **AI splitting**: litellm==1.82.6 (pinned — supply chain incident on 1.82.7/1.82.8) calls any LLM with a structured prompt. Response is validated (contiguous, non-overlapping, full coverage). See `docs/design.md` "Stage 4" section.
-- **Frontend**: htmx 2.0 for server-driven HTML swapping + SSE progress. Alpine.js 3.15 for client-side UI state. Tailwind CSS 4.2 (standalone CLI, no Node.js). jinja2-fragments for rendering partial template blocks.
-- **Two storage volumes**: Internal (`/app/data` — sessions, processing state) and Output (`/output` — archive + medical records folder). PaperlessNGX via REST API, not filesystem.
-- **Tech stack research**: See `.claude/rules/tech-stack-2026.md` for full version rationale and security notes.
-
-## Documentation
-
-| Document | Purpose |
-|----------|---------|
-| `docs/design.md` | **Single source of truth** for all behavior, UX, architecture, and error handling |
-| `docs/api-spec.md` | REST API reference — endpoints, request/response formats, examples |
-| `docs/mcp-server.md` | MCP server specification — tools, resources, prompts for AI agents |
-| `docs/ui-spec.md` | Visual design — components, layouts, accessibility, interaction patterns |
-| `docs/plans/2026-03-28-scanbox-implementation.md` | Task-by-task implementation plan |
-
-**When in doubt, the design spec answers it.**
-
-## Implementation Plan
-
-`docs/plans/2026-03-28-scanbox-implementation.md` contains tasks across 3 phases:
-
-| Phase | Tasks | Deliverables |
-|-------|-------|-------------|
-| **1: Pipeline Core** | 1-10 | Config, models, test fixtures, interleave, blank detect, namer, splitter, OCR, output, pipeline runner, eSCL client. All TDD. |
-| **2: API + Web UI** | 11-17 | Database, FastAPI app, scanning/processing/document APIs, SSE, web UI templates, E2E test. |
-| **3: Polish + Integration** | 18+ | Setup wizard, practice run, boundary editor, MCP server, webhooks, Docker verification. |
-
-Phase 1 tasks have **complete code in every step** — tests and implementations ready to type in. Phase 2-3 tasks define behavior and reference the design spec for details.
-
-**Execute tasks in order.** Each task depends on the previous. Each task ends with a commit.
+1. **Fix root causes.** Never work around failures or silence errors.
+2. **No AI attribution.** No `Co-Authored-By`, `Signed-off-by`, or similar trailers.
+3. **Format before commit.** `ruff format` — the pre-commit hook enforces this.
+4. **Verify CI after push.** If red, fix immediately.
+5. **TDD.** Write failing tests first, then implement.
+6. **Design spec is authoritative.** `docs/design.md` is the single source of truth.
+7. **Plain English for users.** Never show technical jargon in the UI.
+8. **Minimal changes.** Don't refactor, add docstrings, or "improve" code beyond the task.
+9. **No speculative abstractions.** Build what's needed now, not what might be needed later.
 
 ## Git Workflow
 
 **Linear history only. No merge commits.**
 
-| Operation | Correct | Wrong |
-|-----------|---------|-------|
-| Update branch | `git rebase origin/main` | `git merge main` |
-| Pull changes | `git pull` (configured to rebase) | - |
-| Integrate to main | `git merge --ff-only <branch>` | `git merge <branch>` |
+```
+git pull                          # configured to rebase
+git rebase origin/main            # update branch (never merge)
+git merge --ff-only <branch>      # integrate to main
+```
 
-Git config enforces this: `pull.rebase=true`, `merge.ff=only`.
+**Conventional commits:** `feat:`, `fix:`, `test:`, `docs:`, `ci:`, `chore:`, `refactor:`
 
-### Commits
+**PR workflow:** Feature branch → squash merge → delete branch.
 
-- **Conventional commits required**: `feat:`, `fix:`, `docs:`, `ci:`, `chore:`, `refactor:`, `test:`, `perf:`, `build:`, `style:`, `revert:`
-- **Never add AI attribution trailers**
-- **Squash merge** feature/fix PRs
-- **Regular merge** release-please Release PRs
+## Quality Gates
 
-### Quality Gates
+Four layers, innermost to outermost:
 
-1. **Permission deny rules** (`.claude/settings.json`) — hard-block force push, hard reset, checkout-dot, clean -f
-2. **Git pre-commit hook** (`.githooks/pre-commit`) — ruff check + format before commit
-3. **Claude Code hooks** (`.claude/settings.json`) — lint + format + tests before commit; lint + format + pull before push
-4. **GitHub CI** — Lint + Test + Docker Build on push/PR
+1. **Pre-commit hook** (`.githooks/pre-commit`) — ruff check + format
+2. **Claude Code hooks** (`.claude/settings.json`) — lint + format + full test suite before `git commit`; lint + format + rebase before `git push`
+3. **Permission deny rules** — force push, hard reset, checkout-dot, clean -f are blocked
+4. **GitHub CI** — lint, test with coverage (>= 85%), Docker build
 
-## Key Conventions
+## Key Technical Details
 
-- Python >= 3.13
-- ruff line-length: 100
-- All env vars in `scanbox/config.py` with sensible defaults
-- LLM provider configurable via `LLM_PROVIDER` env var (anthropic, openai, ollama)
-- PaperlessNGX integration is optional
-- MCP server is opt-in via `MCP_ENABLED=true`
-- API authentication is optional via `SCANBOX_API_KEY` (off by default for local use)
-- Target user (web UI) is non-technical — plain English, no jargon
-- Every automated decision is a suggestion the user (or their AI agent) can override
+### Pipeline
+- **Checkpointing:** Each stage writes to disk before the next begins. `state.json` tracks progress per batch. Pipeline resumes from last checkpoint on crash.
+- **Batch states:** `scanning_fronts → fronts_done → scanning_backs → backs_done → processing → review → saved`
+- **AI splitting:** One litellm call per batch (all pages). Response validated for contiguous, non-overlapping, full-coverage page ranges.
+
+### eSCL Protocol
+- Endpoints at `http://{ip}/eSCL/...` (capital S, C, L)
+- POST `/ScanJobs` → 201 with `Location` header → GET `NextDocument` in loop → 404 means ADF empty
+- No authentication. Simplex ADF only (two-pass duplex is a hardware limitation).
+
+### Storage
+- **Internal volume** (`/app/data`): sessions, batches, processing state — safety net
+- **Output volume** (`/output`): archive + organized medical records — user-facing
+- **PaperlessNGX**: REST API upload (`POST /api/documents/post_document/`), not filesystem
+
+### Frontend
+- **htmx 2.0** for server communication + SSE progress (self-hosted, no CDN)
+- **Alpine.js 3.15** for client-side UI state (self-hosted)
+- **Tailwind CSS 4.2** via standalone CLI at Docker build time (no Node.js)
+- **jinja2-fragments** for partial template rendering on htmx requests
+
+### Dependencies
+- `litellm==1.82.6` — exact pin due to supply chain incident on 1.82.7/1.82.8
+- `pikepdf` — use `allow_overwriting_input=True` when saving to same path
+- `ocrmypdf` — requires tesseract, ghostscript (since v17), poppler as system packages
+
+## Mocking Patterns
+
+Patterns discovered during development — follow these when writing tests:
+
+### Lazy imports in endpoints
+Setup endpoints (`scanbox/api/setup.py`) import ESCLClient, litellm, and PaperlessClient inside function bodies. Patch at the **source module**, not the endpoint module:
+```python
+@patch("scanbox.scanner.escl.ESCLClient")        # not scanbox.api.setup.ESCLClient
+@patch("litellm.acompletion")                     # not scanbox.api.setup.litellm
+@patch("scanbox.api.paperless.PaperlessClient.check_connection")
+```
+
+### Module-level config singletons
+`scanbox/pipeline/splitter.py` imports `config` at module level. `monkeypatch.setenv` won't work — patch the config object:
+```python
+@patch("scanbox.pipeline.splitter.config")
+async def test_model(self, mock_config):
+    mock_config.llm_model_id.return_value = "gpt-4o-mini"
+```
+
+### pikepdf in tests
+Use `BytesIO` from `io`, not `pikepdf.BytesIO` (doesn't exist). When creating test PDFs:
+```python
+pdf = pikepdf.Pdf.new()
+pdf.add_blank_page(page_size=(612, 792))
+pdf.save(buf)
+```
+
+### JSON key types
+`text_by_page.json` uses string keys (`"1"`, `"2"`) since JSON doesn't support integer keys. Access as `text_data["1"]`, not `text_data[1]`.
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `docs/design.md` | **Single source of truth** — behavior, architecture, error handling |
+| `docs/api-spec.md` | REST API reference — all endpoints with examples |
+| `docs/mcp-server.md` | MCP server — 20 tools, 2 resources, 4 prompts |
+| `docs/ui-spec.md` | Visual design — components, layouts, accessibility |
+| `docs/plans/2026-03-28-scanbox-implementation.md` | Original implementation plan (all tasks complete) |
 
 ## CI/CD
 
-`ci.yml`: lint + test + docker build on push/PR.
-`lint-pr.yml`: conventional commit PR title validation.
-`release-please.yml`: auto-changelog + version bump on push to main.
-`release.yml`: multi-arch Docker image (amd64+arm64) to GHCR.
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | Push/PR to main | Lint + test (85% coverage gate) + Docker build |
+| `lint-pr.yml` | PR | Conventional commit title validation |
+| `release-please.yml` | Push to main | Auto-changelog + version bump |
+| `release.yml` | Release tag | Multi-arch Docker image (amd64+arm64) to GHCR |
+
+## V1 Scope Boundaries
+
+Explicitly out of scope — do not add these:
+
+- Barcode separator sheets, multi-scanner support, mobile-responsive UI
+- ntfy notifications, direct EHR/Epic upload, document deduplication
+- Heuristic-only splitting (without LLM), custom output routing per document
+- Manual page reorder for interleaving, reopening past sessions for new scans

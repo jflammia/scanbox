@@ -98,9 +98,12 @@ Check system health — scanner connectivity, LLM availability, storage status.
 ```json
 {
   "status": "ok",
-  "scanner": "idle",
-  "llm": "ok",
-  "storage": "ok"
+  "api": "ok",
+  "database": "ok",
+  "scanner": "ok",
+  "storage": {"internal": "ok", "output": "ok"},
+  "llm": {"provider": "anthropic", "model": "claude-haiku-4-5-20251001", "configured": true},
+  "paperless": {"configured": false}
 }
 ```
 
@@ -112,13 +115,34 @@ Get the current scanner status with a human-readable message.
 
 **Input:** none
 
-**Output:**
+**Output (scanner reachable):**
 
 ```json
 {
+  "scanner_ip": "192.168.1.100",
   "status": "idle",
   "adf_loaded": true,
   "message": "Scanner ready — paper loaded in ADF"
+}
+```
+
+**Output (scanner unreachable):**
+
+```json
+{
+  "scanner_ip": "192.168.1.100",
+  "status": "unreachable",
+  "message": "Can't reach the scanner. Is it turned on?"
+}
+```
+
+**Output (not configured):**
+
+```json
+{
+  "scanner_ip": "not configured",
+  "status": "not configured",
+  "message": "No scanner configured. Set the SCANNER_IP environment variable."
 }
 ```
 
@@ -487,6 +511,91 @@ Reprocess a batch from raw scans without re-scanning.
 
 ---
 
+### `scanbox_setup_guide`
+
+Get the setup wizard status and step-by-step guide for configuring ScanBox. Use this to help users get started or resume an incomplete setup.
+
+**Input:** none
+
+**Output:**
+
+```json
+{
+  "setup_completed": false,
+  "current_step": 1,
+  "total_steps": 6,
+  "steps": [
+    {"step": 1, "name": "Scanner Connection", "description": "...", "test_command": "..."},
+    {"step": 2, "name": "LLM Provider", "description": "...", "test_command": "..."},
+    {"step": 3, "name": "Output Directory", "description": "..."},
+    {"step": 4, "name": "PaperlessNGX (Optional)", "description": "...", "test_command": "..."},
+    {"step": 5, "name": "Create a Person", "description": "..."},
+    {"step": 6, "name": "Test Scan", "description": "..."}
+  ]
+}
+```
+
+---
+
+### `scanbox_test_connection`
+
+Test connectivity to a specific service or all services at once.
+
+**Input:**
+
+```json
+{
+  "service": "scanner"
+}
+```
+
+`service` must be one of: `scanner`, `llm`, `paperless`, `all`.
+
+**Output (single service):**
+
+```json
+{
+  "success": true,
+  "service": "scanner",
+  "model": "HP Color LaserJet MFP M283cdw",
+  "message": "Scanner connected"
+}
+```
+
+**Output (all):**
+
+```json
+{
+  "scanner": {"success": true, "message": "Scanner connected"},
+  "llm": {"success": true, "message": "LLM provider connected"},
+  "paperless": {"success": false, "message": "PaperlessNGX not configured."}
+}
+```
+
+---
+
+### `scanbox_diagnose_system`
+
+Run a comprehensive system diagnostic. Checks all subsystems, setup status, and session count. Returns a list of issues with plain-English explanations and suggested fixes.
+
+**Input:** none
+
+**Output:**
+
+```json
+{
+  "health": {"status": "degraded", "api": "ok", "database": "ok", "scanner": "unreachable", "...": "..."},
+  "setup": {"completed": true, "current_step": 6, "total_steps": 6},
+  "session_count": 5,
+  "issues": [
+    "Scanner is unreachable. Check that the scanner is powered on, connected to the network, and WebScan is enabled in its settings."
+  ],
+  "summary": "1 issue(s) found."
+}
+```
+
+---
+
 ## Resources
 
 Resources are read-only data that agents can access for context.
@@ -498,18 +607,6 @@ Current system status (scanner, LLM, storage).
 ### `scanbox://sessions`
 
 List of all scanning sessions with summary info.
-
-### `scanbox://batches/{batch_id}`
-
-Full batch details including state, page counts, and document list.
-
-### `scanbox://documents/{document_id}`
-
-Document metadata including type, date, facility, provider, description.
-
-### `scanbox://documents/{document_id}/text`
-
-Full OCR-extracted text for a document (all pages).
 
 ---
 
@@ -544,6 +641,18 @@ Help classify a document that the AI splitting stage couldn't confidently identi
 ```
 
 **Generated prompt:** Provides the document's OCR text and asks the agent to determine the document type, date of service, facility, provider, and description.
+
+### `onboarding`
+
+Guide a new user through ScanBox setup and first scan. Runs diagnostics, walks through each setup step, tests connections, then guides through a first scan.
+
+**Arguments:** none
+
+### `troubleshoot`
+
+Diagnose and fix issues with ScanBox. Runs system diagnostics, explains problems in plain English, suggests fixes, and verifies they work.
+
+**Arguments:** none
 
 ---
 
@@ -595,9 +704,11 @@ Agent: Everything looks good. Saving all documents.
 
 ## Implementation Notes
 
-- Built on the `mcp` Python SDK
-- MCP tools delegate to the same service layer as the REST API — no duplicate business logic
-- The MCP server runs in the same process as FastAPI (shared database, pipeline, config)
-- stdio transport is used when invoked via `python -m scanbox.mcp` (for Claude Desktop / docker exec)
-- SSE transport is available at `/mcp` when running as part of the web server
+- Built on the `mcp` Python SDK (FastMCP)
+- 20 tools, 2 resources, 4 prompts
+- MCP tools delegate to the REST API — no duplicate business logic
+- The MCP server runs in the same FastAPI process (shared database, pipeline, config)
+- stdio transport via `python -m scanbox.mcp` (for Claude Desktop / docker exec)
+- Streamable HTTP transport at `/mcp` when `MCP_ENABLED=true`
 - Tool responses include human-readable `message` fields so agents can relay status naturally
+- Onboarding tools (`setup_guide`, `test_connection`, `diagnose_system`) enable AI agents to help users configure and troubleshoot at any point

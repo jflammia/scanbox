@@ -1,13 +1,20 @@
-"""Webhook registration, listing, and deletion endpoints."""
+"""Webhook registration, listing, deletion, and dispatch."""
 
+import hashlib
+import hmac
 import json
+import logging
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
 from scanbox.config import Config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["webhooks"])
 
@@ -88,3 +95,49 @@ async def delete_webhook(webhook_id: str):
 async def list_event_types():
     """List available webhook event types."""
     return {"events": VALID_EVENTS}
+
+
+async def dispatch_webhook_event(event: str, data: dict) -> None:
+    """Dispatch an event to all registered webhooks that subscribe to it.
+
+    Checks both API-registered webhooks and the WEBHOOK_URL env var.
+    Fire-and-forget: delivery failures are logged, not raised.
+    """
+    webhooks = _read_webhooks()
+
+    # Include env-var-based webhook if configured (subscribes to all events)
+    cfg = Config()
+    if cfg.WEBHOOK_URL:
+        env_webhook = {"id": "__env__", "url": cfg.WEBHOOK_URL, "events": VALID_EVENTS}
+        if cfg.WEBHOOK_SECRET:
+            env_webhook["secret"] = cfg.WEBHOOK_SECRET
+        webhooks.append(env_webhook)
+
+    matching = [w for w in webhooks if event in w.get("events", [])]
+    if not matching:
+        return
+
+    payload = {
+        "event": event,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "data": data,
+    }
+
+    async with httpx.AsyncClient() as client:
+        for webhook in matching:
+            try:
+                headers = {"Content-Type": "application/json"}
+                secret = webhook.get("secret")
+                if secret:
+                    body = json.dumps(payload)
+                    sig = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+                    headers["X-Webhook-Signature"] = f"sha256={sig}"
+
+                await client.post(webhook["url"], json=payload, headers=headers)
+            except Exception:
+                logger.warning(
+                    "Webhook delivery failed for %s to %s",
+                    event,
+                    webhook.get("url"),
+                    exc_info=True,
+                )

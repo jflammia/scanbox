@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Adjust Boundaries{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/results/{{ batch_id }}" class="hover:text-text-primary no-underline">&larr; Back to results</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section x-data="boundaryEditor()" class="space-y-6">
+  <h1 class="text-3xl font-bold">Adjust Document Boundaries</h1>
+  <p class="text-lg text-text-secondary">
+    Click between pages to add or remove a divider.
+    Each section becomes a separate document.
+  </p>
+
+  {# Thumbnail strip #}
+  <div class="overflow-x-auto pb-4">
+    <div class="flex items-end gap-1 min-w-max">
+      <template x-for="page in totalPages" :key="page">
+        <div class="flex items-end">
+          {# Page thumbnail #}
+          <div class="cursor-pointer relative"
+               @click="selectPage(page)">
+            <img :src="'/api/batches/{{ batch_id }}/pages/' + page + '/thumbnail'"
+                 :alt="'Page ' + page"
+                 class="w-20 h-28 object-cover rounded border-2 transition-all"
+                 :class="selectedPage === page ? 'border-brand-600 ring-2 ring-brand-300' : 'border-border hover:border-brand-400'"
+                 loading="lazy"
+                 onerror="this.src='/static/img/pdf-placeholder.svg'">
+            <span class="absolute bottom-1 left-1/2 -translate-x-1/2 text-xs bg-black/60 text-white px-1.5 py-0.5 rounded"
+                  x-text="page"></span>
+            {# Document label #}
+            <template x-if="isDocStart(page)">
+              <span class="absolute -top-5 left-0 text-xs font-medium text-brand-600 whitespace-nowrap"
+                    x-text="'Doc ' + getDocIndex(page)"></span>
+            </template>
+          </div>
+
+          {# Divider gap (clickable) — shown between pages #}
+          <template x-if="page < totalPages">
+            <div class="flex flex-col items-center justify-end mx-0.5 cursor-pointer group"
+                 @click="toggleBoundary(page)"
+                 :title="hasBoundary(page) ? 'Remove divider' : 'Add divider'">
+              <div class="w-1 rounded-full transition-all"
+                   :class="hasBoundary(page) ? 'h-28 bg-brand-600' : 'h-8 bg-gray-300 group-hover:bg-brand-400 group-hover:h-28'">
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  {# Page preview #}
+  <template x-if="selectedPage">
+    <div class="bg-surface-raised border border-border rounded-lg p-4">
+      <h3 class="font-semibold mb-2">Page <span x-text="selectedPage"></span></h3>
+      <img :src="'/api/batches/{{ batch_id }}/pages/' + selectedPage + '/thumbnail'"
+           alt="Full page preview"
+           class="max-w-md mx-auto rounded shadow"
+           onerror="this.src='/static/img/pdf-placeholder.svg'">
+    </div>
+  </template>
+
+  {# Summary #}
+  <div class="flex items-center justify-between bg-surface-raised border border-border rounded-lg p-4">
+    <p class="text-text-secondary">
+      <span x-text="documentCount()"></span> document<span x-show="documentCount() !== 1">s</span>
+      from <span x-text="totalPages"></span> pages
+    </p>
+    <div class="flex gap-3">
+      <a href="/results/{{ batch_id }}"
+         class="px-4 py-2 border border-border rounded-lg font-medium no-underline text-text-primary hover:bg-gray-50">
+        Cancel
+      </a>
+      <button @click="applyChanges()"
+              :disabled="saving"
+              class="bg-brand-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-brand-700 disabled:opacity-50 transition-colors">
+        <span x-show="!saving">Apply Changes</span>
+        <span x-show="saving">Saving...</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+function boundaryEditor() {
+  return {
+    totalPages: {{ total_pages }},
+    boundaries: new Set({{ boundary_pages | tojson }}),
+    selectedPage: null,
+    saving: false,
+
+    hasBoundary(afterPage) {
+      return this.boundaries.has(afterPage);
+    },
+
+    toggleBoundary(afterPage) {
+      if (this.boundaries.has(afterPage)) {
+        this.boundaries.delete(afterPage);
+      } else {
+        this.boundaries.add(afterPage);
+      }
+    },
+
+    isDocStart(page) {
+      return page === 1 || this.boundaries.has(page - 1);
+    },
+
+    getDocIndex(page) {
+      let idx = 1;
+      for (let p = 1; p < page; p++) {
+        if (this.boundaries.has(p)) idx++;
+      }
+      return idx;
+    },
+
+    documentCount() {
+      return this.boundaries.size + 1;
+    },
+
+    selectPage(page) {
+      this.selectedPage = this.selectedPage === page ? null : page;
+    },
+
+    async applyChanges() {
+      this.saving = true;
+      const sortedBounds = [...this.boundaries].sort((a, b) => a - b);
+      const ranges = [];
+      let start = 1;
+      for (const b of sortedBounds) {
+        ranges.push({ start_page: start, end_page: b });
+        start = b + 1;
+      }
+      ranges.push({ start_page: start, end_page: this.totalPages });
+
+      try {
+        const resp = await fetch('/api/batches/{{ batch_id }}/boundaries', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ boundaries: ranges })
+        });
+        if (resp.ok) {
+          window.location.href = '/results/{{ batch_id }}';
+        } else {
+          window.dispatchEvent(new CustomEvent('show-toast', {
+            detail: { message: 'Failed to update boundaries', type: 'error' }
+          }));
+        }
+      } catch (e) {
+        window.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: 'Network error', type: 'error' }
+        }));
+      }
+      this.saving = false;
+    }
+  };
+}
+</script>
+{% endblock %}

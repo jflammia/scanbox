@@ -1,113 +1,193 @@
 <div align="center">
 
-# ScanBox
+<img src="static/img/logo.svg" alt="ScanBox" width="240">
 
-**Scan, split, and organize stacks of documents — from your browser, your AI agent, or a script.**
+### Scan, split, and organize stacks of documents — from your browser, your AI agent, or a script.
 
 [![CI](https://github.com/jflammia/scanbox/actions/workflows/ci.yml/badge.svg)](https://github.com/jflammia/scanbox/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/jflammia/scanbox)
+[![GitHub Release](https://img.shields.io/github/v/release/jflammia/scanbox?include_prereleases&label=release)](https://github.com/jflammia/scanbox/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/jflammia/scanbox?style=flat)](https://github.com/jflammia/scanbox/stargazers)
+
+<a href="https://glama.ai/mcp/servers"><img width="380" height="auto" alt="MCP Server" src="https://glama.ai/mcp/servers/badge" /></a>
+
+[Quick Start](#quick-start) · [Features](#features) · [Screenshots](#screenshots) · [Documentation](#documentation) · [API](#api) · [MCP](#mcp-integration) · [Contributing](#contributing)
 
 </div>
 
 ---
 
-ScanBox is a self-hosted, API-first web app that turns a network scanner into a hands-free document digitization station. Load paper, click scan (or tell your AI agent to scan), and ScanBox handles the rest — interleaving duplex pages, removing blanks, OCR, AI-powered document splitting, professional naming, and organized filing.
+## What Is ScanBox?
+
+ScanBox is a self-hosted web app that turns a network scanner into a hands-free document digitization station. Load paper, click scan (or tell your AI agent to), and ScanBox handles the rest — interleaving duplex pages, removing blanks, OCR, AI-powered document splitting, professional naming, and organized filing.
 
 Built for scanning hundreds of medical records, tax documents, or any mixed stack where you don't know where one document ends and the next begins.
 
-> **Status:** Under active development. Not yet ready for production use.
+> **Privacy first.** Everything runs locally. Only OCR text (not images or PDFs) is sent to the LLM for document splitting. Use Ollama for fully offline operation.
 
-## Three Interfaces, One Engine
+## Screenshots
 
-| Interface | For | How |
-|-----------|-----|-----|
-| **REST API** | Scripts, automation, external tools | `POST /api/sessions`, `POST /api/batches/{id}/scan`, etc. OpenAPI docs at `/api/docs` |
-| **MCP Server** | AI agents (Claude, etc.) | Native tool calls: `scanbox_scan_fronts`, `scanbox_list_documents`, `scanbox_save_batch` |
-| **Web UI** | Humans | Browser at `http://localhost:8090` — wizard-guided scanning workflow |
+<!--
+  TO ADD SCREENSHOTS:
+  1. Run ScanBox locally: docker compose up
+  2. Capture screenshots at 1280x800 (full page) or 800x500 (cropped)
+  3. Save as PNG to docs/images/
+  4. Uncomment the table rows below
 
-All three interfaces use the same backend. Anything you can do in the web UI, you can do from an API call or AI agent tool.
+  Recommended screenshots:
+  - screenshot-scan.png        → Scanning wizard (step 1 or 2)
+  - screenshot-review.png      → Results page with document cards
+  - screenshot-boundaries.png  → Boundary editor with thumbnail strip
+  - screenshot-cards.png       → Close-up of document cards with metadata
+  - screenshot-setup.png       → First-run setup wizard
+  - screenshot-status.png      → Scanner status indicator
+-->
 
-## How It Works
+| Scanning Wizard | Review & Edit | Boundary Editor |
+|:---:|:---:|:---:|
+| ![Scanning wizard](docs/images/screenshot-scan.png) | ![Review results](docs/images/screenshot-review.png) | ![Boundary editor](docs/images/screenshot-boundaries.png) |
 
-1. **Load paper** in your scanner's document feeder
-2. **Start a scan** — from the web UI, an API call, or an AI agent
-3. **Flip the stack** if pages are double-sided, scan backs
-4. **ScanBox processes everything** in the background:
-   - Interleaves front and back pages
-   - Removes blank pages
-   - Reads all text (OCR)
-   - Uses AI to figure out where each document starts and ends
-   - Names each document with the date, type, and source
-5. **Review the results** — fix anything the AI got wrong (in the UI or via API)
-6. **Save** — organized PDFs land in your output folder, ready to share
-
-Your scanner's touchscreen is never used. Everything is controlled remotely.
+| Document Cards | Setup Wizard | Scanner Status |
+|:---:|:---:|:---:|
+| ![Document cards](docs/images/screenshot-cards.png) | ![Setup wizard](docs/images/screenshot-setup.png) | ![Scanner status](docs/images/screenshot-status.png) |
 
 ## Features
 
-- **API-first architecture** — every capability exposed via REST API with OpenAPI docs
-- **MCP server** — AI agents interact natively via Model Context Protocol
-- **Webhooks** — get notified when scans complete, processing finishes, or documents are saved
-- **Remote scanner control** via eSCL protocol (no drivers needed)
-- **Two-pass duplex** workflow for simplex-only ADF scanners
-- **AI document splitting** — detects boundaries between different documents in a mixed stack
-- **Medical-professional naming** — `2025-06-15_John-Doe_Radiology-Report_Memorial-Hospital.pdf`
-- **Multi-person support** — scan records for different people, kept separate
-- **Human authority** — every AI decision is a suggestion you can override
-- **Crash-safe** — every stage checkpoints to disk; nothing is lost if the app restarts
-- **PaperlessNGX integration** (optional) — upload via API with tags, types, and dates
-- **Any LLM provider** — Anthropic, OpenAI, or Ollama (local, fully offline)
-- **Runs anywhere** — laptop, home server, or cloud VM
+- **Automatic duplex scanning** — two-pass ADF scanning with automatic page interleaving
+- **Blank page removal** — detects and removes blank pages from scanned stacks
+- **OCR** — full-text extraction via ocrmypdf with deskew and rotation correction
+- **AI document splitting** — LLM-powered boundary detection for mixed document stacks
+- **Professional naming** — generates filenames like `2025-06-15_John-Doe_Radiology-Report_Memorial-Hospital.pdf`
+- **Interactive boundary editor** — click between page thumbnails to adjust where documents split
+- **Three interfaces** — Web UI, REST API, and MCP server all share the same backend
+- **PaperlessNGX integration** — optional upload via REST API with metadata
+- **Webhook notifications** — `scan.completed`, `processing.completed`, `save.completed` events
+- **Crash-safe pipeline** — checkpointed processing resumes from the last completed stage
+- **Multi-arch Docker** — runs on amd64 and arm64 (Raspberry Pi, Apple Silicon)
+- **No drivers needed** — talks directly to scanners via eSCL/AirScan protocol
+- **Fully offline capable** — use Ollama as the LLM provider for air-gapped environments
+
+## How It Works
+
+```
+ 1. Load paper ──► 2. Scan fronts ──► 3. Flip & scan backs ──► 4. Automatic processing ──► 5. Review ──► 6. Save
+                                                                     │
+                                                          Interleave → Remove blanks
+                                                          → OCR → AI split → Name
+```
+
+1. **Load paper** in your scanner's document feeder
+2. **Scan** — from the web UI, an API call, or an AI agent
+3. **Flip the stack** if double-sided, scan backs
+4. ScanBox **processes everything** automatically:
+   - Interleaves front and back pages into correct order
+   - Removes blank pages
+   - OCR — extracts all text
+   - AI splits the stack into individual documents
+   - Names each file professionally with dates, types, and facilities
+5. **Review** — fix anything the AI got wrong (boundaries, names, metadata)
+6. **Save** — organized PDFs to your output folder, optionally uploaded to PaperlessNGX
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/jflammia/scanbox.git
 cd scanbox
-
-# Configure (only 2 required settings)
-cp .env.example .env
-# Edit .env: set SCANNER_IP and your LLM provider
-
-# Start
-docker compose up
-
-# Open http://localhost:8090
+cp .env.example .env    # set SCANNER_IP and LLM provider
+docker compose up       # http://localhost:8090
 ```
 
-The first-run setup wizard walks you through connecting your scanner and (optionally) PaperlessNGX.
+The setup wizard walks you through connecting your scanner and LLM on first run.
 
-## API Quick Start
+### Docker Compose
+
+```yaml
+services:
+  scanbox:
+    image: ghcr.io/jflammia/scanbox:latest
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    volumes:
+      - scanbox-data:/app/data
+      - ./output:/output
+    restart: unless-stopped
+
+volumes:
+  scanbox-data:
+```
+
+### From Source
 
 ```bash
-# Create a person
-curl -X POST http://localhost:8090/api/persons \
-  -H "Content-Type: application/json" \
-  -d '{"display_name": "John Doe"}'
-
-# Create a session
-curl -X POST http://localhost:8090/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{"person_id": "john-doe"}'
-
-# Trigger a scan
-curl -X POST http://localhost:8090/api/batches/{batch_id}/scan/fronts
-
-# Check status
-curl http://localhost:8090/api/batches/{batch_id}
-
-# List extracted documents
-curl http://localhost:8090/api/batches/{batch_id}/documents
-
-# Save everything
-curl -X POST http://localhost:8090/api/batches/{batch_id}/save
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+brew install tesseract poppler ghostscript   # macOS
+uvicorn scanbox.main:app --port 8090
 ```
 
-Full API docs: `http://localhost:8090/api/docs` | Spec: [`docs/api-spec.md`](docs/api-spec.md)
+## Configuration
 
-## MCP Integration (AI Agents)
+All settings via environment variables in `.env`:
 
-Add ScanBox to your Claude Desktop config:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SCANNER_IP` | Yes | IP address of your eSCL/AirScan scanner |
+| `LLM_PROVIDER` | Yes | `anthropic`, `openai`, or `ollama` |
+| `ANTHROPIC_API_KEY` | If Anthropic | API key for Claude |
+| `OPENAI_API_KEY` | If OpenAI | API key for GPT |
+| `OLLAMA_URL` | If Ollama | Server URL (default: `http://localhost:11434`) |
+| `LLM_MODEL` | No | Override default model for your provider |
+| `OUTPUT_DIR` | No | Output folder (default: `./output`) |
+| `PAPERLESS_URL` | No | PaperlessNGX instance URL |
+| `PAPERLESS_API_TOKEN` | No | PaperlessNGX API token |
+| `SCANBOX_API_KEY` | No | Bearer token auth (off by default for local use) |
+| `MCP_ENABLED` | No | Enable MCP server at `/mcp` |
+| `WEBHOOK_URL` | No | URL for event notifications |
+| `WEBHOOK_SECRET` | No | HMAC-SHA256 secret for webhook signatures |
+
+See [`.env.example`](.env.example) for a complete template.
+
+## Three Interfaces, One Engine
+
+| Interface | For | How |
+|-----------|-----|-----|
+| **REST API** | Scripts, automation, external tools | Full CRUD at `/api/*`. OpenAPI docs at `/api/docs` |
+| **MCP Server** | AI agents (Claude, etc.) | 20 native tools at `/mcp`. Enable with `MCP_ENABLED=true` |
+| **Web UI** | Humans | Wizard-guided scanning at `http://localhost:8090` |
+
+All three share the same backend. Anything you can do in the browser, you can do from curl or Claude.
+
+## API
+
+```bash
+# Create a person and session
+curl -X POST localhost:8090/api/persons -d '{"display_name": "John Doe"}'
+curl -X POST localhost:8090/api/sessions -d '{"person_id": "john-doe"}'
+
+# Scan
+curl -X POST localhost:8090/api/batches/{id}/scan/fronts
+
+# Review results
+curl localhost:8090/api/batches/{id}/documents
+
+# Save
+curl -X POST localhost:8090/api/batches/{id}/save
+```
+
+Interactive docs at `http://localhost:8090/api/docs`. Full reference: [`docs/api-spec.md`](docs/api-spec.md).
+
+## MCP Integration
+
+ScanBox exposes a [Model Context Protocol](https://modelcontextprotocol.io) server so AI agents can drive the full scanning workflow through native tool calls.
+
+**20 tools** including `scanbox_scan_fronts`, `scanbox_list_documents`, `scanbox_update_document`, `scanbox_diagnose_system`, and more. Plus 2 resources and 4 prompts.
+
+Add to your AI agent config:
 
 ```json
 {
@@ -121,102 +201,106 @@ Add ScanBox to your Claude Desktop config:
 }
 ```
 
-Then ask Claude: *"Scan the documents in the feeder, review the results, and save them."*
-
-Full MCP spec: [`docs/mcp-server.md`](docs/mcp-server.md)
-
-## Requirements
-
-- **Docker** (or Podman)
-- A **network scanner** that supports eSCL/AirScan (most modern HP, Canon, Epson, Brother)
-- An **LLM provider** for document splitting:
-  - Anthropic API key, or
-  - OpenAI API key, or
-  - Local [Ollama](https://ollama.com) instance (fully offline, no data leaves your network)
-
-## Configuration
-
-All configuration is via environment variables in `.env`:
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `SCANNER_IP` | Yes | IP address of your network scanner |
-| `LLM_PROVIDER` | Yes | `anthropic`, `openai`, or `ollama` |
-| `ANTHROPIC_API_KEY` | If provider=anthropic | Anthropic API key |
-| `OPENAI_API_KEY` | If provider=openai | OpenAI API key |
-| `OLLAMA_URL` | If provider=ollama | Ollama server URL (default: `http://localhost:11434`) |
-| `PAPERLESS_URL` | No | PaperlessNGX instance URL |
-| `PAPERLESS_API_TOKEN` | No | PaperlessNGX API token |
-| `OUTPUT_DIR` | No | Output folder (default: `./output`) |
-| `SCANBOX_API_KEY` | No | Protect API with bearer token (off by default) |
-| `MCP_ENABLED` | No | Enable MCP server for AI agent integration |
-| `WEBHOOK_URL` | No | URL to receive event notifications |
+Full reference: [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ## Output Structure
 
 ```
 output/
-├── archive/                          # Raw scans (safety backup)
+├── archive/                     # Raw scan backup
 │   └── john-doe/2026-03-28/
 │       └── batch-001-combined.pdf
-└── medical-records/                  # Organized for sharing
+└── medical-records/             # Organized for sharing
     └── John_Doe/
-        ├── Index.csv                 # Spreadsheet of all documents
+        ├── Index.csv
         ├── Radiology Reports/
-        │   └── 2025-06-15_John-Doe_Radiology-Report_Memorial-Hospital_CT-Abdomen.pdf
-        ├── Discharge Summaries/
+        │   └── 2025-06-15_John-Doe_Radiology-Report_Memorial-Hospital.pdf
         ├── Lab Results/
         └── ...
 ```
 
-Copy the `medical-records/John_Doe/` folder to a USB drive and hand it to a doctor's office.
+## Architecture
 
-## Privacy
+```
+┌──────────┬──────────┬──────────┐
+│  Web UI  │ AI Agent │ Scripts  │
+│ (htmx)   │ (MCP)    │ (curl)   │
+└────┬─────┴────┬─────┴────┬─────┘
+     ▼          ▼          ▼
+┌─────────────────────────────────┐
+│  FastAPI · REST · SSE · MCP     │
+├─────────────────────────────────┤
+│  Pipeline: Interleave → Blanks  │
+│  → OCR → AI Split → Name → Save│
+├─────────────────────────────────┤
+│  SQLite · Checkpointing         │
+└────┬──────────┬──────────┬──────┘
+     ▼          ▼          ▼
+  Scanner    Output     Paperless
+  (eSCL)     (volume)   (optional)
+```
 
-ScanBox processes everything locally. The only data that leaves your network is OCR text sent to the LLM provider for document splitting (no images or PDFs are sent). Choose Ollama for fully offline operation.
-
-| Provider | Data Leaves Network? |
-|----------|---------------------|
-| Ollama (local) | No |
-| Anthropic | Text only |
-| OpenAI | Text only |
+**Tech stack:** Python 3.13, FastAPI, htmx, Alpine.js, Tailwind CSS, pikepdf, ocrmypdf, litellm, aiosqlite.
 
 ## Scanner Compatibility
 
-ScanBox communicates via the **eSCL** (Apple AirScan) protocol — an industry standard supported by most modern network scanners. If your scanner works with Apple's AirScan or Mopria, it works with ScanBox.
+ScanBox uses the **eSCL** (Apple AirScan) protocol — an industry standard supported by most modern network scanners. If your scanner works with AirScan or Mopria, it works with ScanBox. No drivers needed.
 
 **Tested with:** HP Color LaserJet MFP M283cdw
+
+## Development
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+bash .githooks/setup.sh                          # git hooks + rebase config
+brew install tesseract poppler ghostscript        # macOS system deps
+python -m tests.generate_fixtures                 # test PDFs
+
+pytest                      # 603 tests, 94% coverage
+pytest tests/unit/ -v       # unit tests
+pytest tests/integration/   # integration tests
+ruff format scanbox/ tests/ # format
+ruff check scanbox/ tests/  # lint
+```
+
+### Quality Gates
+
+| Layer | What It Checks |
+|-------|----------------|
+| Pre-commit hook | `ruff check` + `ruff format` |
+| Claude Code hooks | Lint + format + full test suite before commit; rebase before push |
+| GitHub CI | Lint, test (85% min coverage), Docker build |
+| Release pipeline | Test + multi-arch Docker image to GHCR |
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [`docs/design.md`](docs/design.md) | Authoritative design spec — behavior, architecture, UX |
-| [`docs/api-spec.md`](docs/api-spec.md) | REST API reference — all endpoints with examples |
-| [`docs/mcp-server.md`](docs/mcp-server.md) | MCP server — tools, resources, prompts for AI agents |
-| [`docs/ui-spec.md`](docs/ui-spec.md) | UI specification — components, layouts, accessibility |
-| [`CLAUDE.md`](CLAUDE.md) | Development guide for AI agents working on this codebase |
+| [`docs/design.md`](docs/design.md) | Authoritative design spec |
+| [`docs/api-spec.md`](docs/api-spec.md) | REST API reference |
+| [`docs/mcp-server.md`](docs/mcp-server.md) | MCP server — 20 tools, 2 resources, 4 prompts |
+| [`docs/ui-spec.md`](docs/ui-spec.md) | UI components and layouts |
+| [`CLAUDE.md`](CLAUDE.md) | AI agent development guide |
 
-## Development
+## Contributing
 
-```bash
-# Setup
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-brew install tesseract poppler ghostscript  # macOS system deps
-bash .githooks/setup.sh          # Git hooks
+Contributions are welcome! Please:
 
-# Test
-pytest                            # All tests
-pytest tests/unit/ -v             # Unit tests
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Follow the existing code style (`ruff format` + `ruff check`)
+4. Write tests for new functionality
+5. Ensure all tests pass (`pytest`)
+6. Use [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.)
+7. Open a pull request against `main`
 
-# Lint
-ruff format scanbox/ tests/
-ruff check scanbox/ tests/
-```
+See [`CLAUDE.md`](CLAUDE.md) for detailed development patterns and architecture notes.
 
-Built with Python 3.13, FastAPI, htmx, Alpine.js, Tailwind CSS, pikepdf, ocrmypdf, and litellm.
+## Acknowledgments
+
+Built with [FastAPI](https://fastapi.tiangolo.com/), [htmx](https://htmx.org/), [Alpine.js](https://alpinejs.dev/), [Tailwind CSS](https://tailwindcss.com/), [pikepdf](https://pikepdf.readthedocs.io/), [ocrmypdf](https://ocrmypdf.readthedocs.io/), and [litellm](https://docs.litellm.ai/).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) &copy; 2026 Justin Flammia
