@@ -42,11 +42,13 @@ async def list_batches(session_id: str):
 
 @router.get("/api/batches/{batch_id}")
 async def get_batch(batch_id: str):
-    """Get batch details and current state."""
+    """Get batch details and current state, including document count."""
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Batch not found")
+    docs = await db.list_documents(batch_id)
+    batch["document_count"] = len(docs)
     return batch
 
 

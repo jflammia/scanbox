@@ -53,16 +53,38 @@ class TestHealthCheck:
 
 
 class TestScannerStatus:
-    async def test_get_scanner_status_configured(self, monkeypatch):
-        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
-        result = await scanbox_get_scanner_status()
-        assert result["scanner_ip"] == "192.168.1.100"
-        assert result["message"] == "Scanner configured"
-
     async def test_get_scanner_status_not_configured(self, monkeypatch):
         monkeypatch.setenv("SCANNER_IP", "")
         result = await scanbox_get_scanner_status()
         assert result["scanner_ip"] == "not configured"
+
+    @patch("scanbox.mcp.server.ESCLClient")
+    async def test_get_scanner_status_with_live_status(self, mock_cls, monkeypatch):
+        from scanbox.scanner.models import ScannerStatus
+
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_cls.return_value = mock_scanner
+        mock_scanner.get_status.return_value = ScannerStatus(
+            state="Idle", adf_loaded=True, adf_state="ScannerAdfLoaded"
+        )
+
+        result = await scanbox_get_scanner_status()
+        assert result["scanner_ip"] == "192.168.1.100"
+        assert result["status"] == "idle"
+        assert result["adf_loaded"] is True
+
+    @patch("scanbox.mcp.server.ESCLClient")
+    async def test_get_scanner_status_unreachable(self, mock_cls, monkeypatch):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_cls.return_value = mock_scanner
+        mock_scanner.get_status.side_effect = Exception("timeout")
+
+        result = await scanbox_get_scanner_status()
+        assert result["scanner_ip"] == "192.168.1.100"
+        assert result["status"] == "unreachable"
+        assert "reach" in result["message"].lower()
 
 
 class TestPersons:
