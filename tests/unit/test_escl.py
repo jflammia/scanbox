@@ -23,6 +23,29 @@ class TestParseStatus:
         assert status.adf_loaded is True
 
 
+class TestParseCapabilitiesIconUrl:
+    def test_icon_url_parsed(self):
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScannerCapabilities xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03"
+                          xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.63</pwg:Version>
+  <pwg:MakeAndModel>HP Color LaserJet MFP M283cdw</pwg:MakeAndModel>
+  <scan:IconURI>http://192.168.1.5/hp/device/scanner.png</scan:IconURI>
+</scan:ScannerCapabilities>"""
+        caps = parse_capabilities(xml)
+        assert caps.icon_url == "http://192.168.1.5/hp/device/scanner.png"
+
+    def test_icon_url_empty_when_missing(self):
+        xml = """<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScannerCapabilities xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03"
+                          xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm">
+  <pwg:Version>2.63</pwg:Version>
+  <pwg:MakeAndModel>HP Color LaserJet MFP M283cdw</pwg:MakeAndModel>
+</scan:ScannerCapabilities>"""
+        caps = parse_capabilities(xml)
+        assert caps.icon_url == ""
+
+
 class TestBuildScanSettings:
     def test_generates_valid_xml(self):
         xml = build_scan_settings_xml(dpi=300, color_mode="RGB24", source="Feeder")

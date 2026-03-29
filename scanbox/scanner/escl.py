@@ -22,6 +22,10 @@ def parse_capabilities(xml_text: str) -> ScannerCapabilities:
     if model_el is not None and model_el.text:
         caps.make_and_model = model_el.text
 
+    icon_el = root.find(".//scan:IconURI", ESCL_NS)
+    if icon_el is not None and icon_el.text:
+        caps.icon_url = icon_el.text
+
     # Check for ADF
     adf = root.find(".//scan:Adf", ESCL_NS)
     if adf is not None:
