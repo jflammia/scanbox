@@ -109,6 +109,20 @@ Check system health — scanner connectivity, LLM availability, storage status.
 
 ---
 
+### `scanbox_discover_scanners`
+
+Scan the local network for eSCL/AirScan scanners using mDNS discovery.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | float | 5.0 | Discovery duration in seconds (max 30.0) |
+
+**Returns:** `{scanners: [{ip, port, model, name, uuid, icon_url, secure}], count, hint}`
+
+When no scanners are found, `hint` explains that mDNS requires the container to have direct LAN access (Linux with `network_mode: host` or macvlan). On macOS or Docker bridge, manual IP configuration is needed.
+
+---
+
 ### `scanbox_get_scanner_status`
 
 Get the current scanner status with a human-readable message.

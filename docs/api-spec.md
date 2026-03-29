@@ -490,6 +490,36 @@ Get current scanner status.
 
 Get scanner capabilities (resolution, formats, ADF support).
 
+#### `POST /api/scanner/discover`
+
+Discover eSCL scanners on the local network via mDNS. Also serves as "rescan."
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | float | 5.0 | Discovery duration in seconds (max 30.0) |
+
+**Response (200):**
+```json
+{
+  "scanners": [{
+    "ip": "192.168.10.11",
+    "port": 80,
+    "model": "HP Color LaserJet MFP M283cdw",
+    "name": "HP Color LaserJet MFP M283cdw._uscan._tcp.local.",
+    "uuid": "1c852a4d-b800-1f08-abcd-843497f7816c",
+    "icon_url": "http://192.168.10.11/images/printer.png",
+    "secure": false
+  }],
+  "count": 1,
+  "hint": null
+}
+```
+
+When no scanners are found, `hint` contains an explanation of container networking constraints and suggests manual IP entry.
+
+> **Note:** mDNS discovery requires Linux with `network_mode: host` or macvlan. On macOS/Docker bridge networking, discovery will return empty results. Use manual IP configuration instead.
+
 ---
 
 ### Setup
