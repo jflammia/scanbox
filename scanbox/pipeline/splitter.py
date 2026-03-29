@@ -136,3 +136,57 @@ async def split_documents(
         raise SplitValidationError(f"Unexpected response format: {type(parsed)}")
 
     return validate_splits(raw_splits, total_pages)
+
+
+CLASSIFY_SYSTEM_PROMPT = (
+    "You are a document analysis assistant. You analyze OCR text from scanned "
+    "medical document pages and classify the document.\n\n"
+    "Return ONLY a JSON object with these fields:\n"
+    "{\n"
+    '  "document_type": "<one of: Radiology Report, Discharge Summary, Care Plan, '
+    "Lab Results, Letter, Operative Report, Progress Note, Pathology Report, "
+    'Prescription, Insurance, Billing, Other>",\n'
+    '  "date_of_service": "<YYYY-MM-DD or \'unknown\'>",\n'
+    '  "facility": "<name or \'unknown\'>",\n'
+    '  "provider": "<doctor name or \'unknown\'>",\n'
+    '  "description": "<3-8 word description>",\n'
+    '  "confidence": <0.0-1.0>\n'
+    "}"
+)
+
+
+async def classify_document_pages(
+    page_texts: dict[int, str],
+    person_name: str,
+) -> dict:
+    """Classify a single document from its OCR page texts.
+
+    Returns a dict with document_type, date_of_service, facility, provider,
+    description, and confidence.
+    """
+    lines = [f"Classify this medical document for patient: {person_name}.", ""]
+    for page_num in sorted(page_texts.keys()):
+        lines.append(f"---PAGE {page_num}---")
+        lines.append(page_texts[page_num])
+        lines.append("")
+
+    response = await litellm.acompletion(
+        model=config.llm_model_id(),
+        messages=[
+            {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
+            {"role": "user", "content": "\n".join(lines)},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.1,
+    )
+
+    content = response.choices[0].message.content
+    parsed = json.loads(content)
+    return {
+        "document_type": parsed.get("document_type", "Other"),
+        "date_of_service": parsed.get("date_of_service", "unknown"),
+        "facility": parsed.get("facility", "unknown"),
+        "provider": parsed.get("provider", "unknown"),
+        "description": parsed.get("description", "Document"),
+        "confidence": max(0.0, min(1.0, float(parsed.get("confidence", 0.5)))),
+    }

@@ -1,0 +1,18 @@
+{% macro status_badge(status, text=None) %}
+{% set display = text or status | title %}
+{% set configs = {
+  'ready': {'bg': 'bg-green-100', 'text': 'text-green-800', 'icon': 'check-circle'},
+  'scanning': {'bg': 'bg-blue-100', 'text': 'text-blue-800', 'icon': 'loader'},
+  'processing': {'bg': 'bg-violet-100', 'text': 'text-violet-800', 'icon': 'cog'},
+  'review': {'bg': 'bg-amber-100', 'text': 'text-amber-800', 'icon': 'eye'},
+  'saved': {'bg': 'bg-green-100', 'text': 'text-green-800', 'icon': 'check'},
+  'error': {'bg': 'bg-red-100', 'text': 'text-red-800', 'icon': 'alert-triangle'},
+  'offline': {'bg': 'bg-gray-100', 'text': 'text-gray-800', 'icon': 'wifi-off'},
+} %}
+{% set cfg = configs.get(status, configs['error']) %}
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full
+             text-sm font-medium {{ cfg.bg }} {{ cfg.text }}">
+  {% include "icons/" ~ cfg.icon ~ ".svg" %}
+  {{ display }}
+</span>
+{% endmacro %}

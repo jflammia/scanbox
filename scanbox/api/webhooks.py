@@ -100,9 +100,19 @@ async def list_event_types():
 async def dispatch_webhook_event(event: str, data: dict) -> None:
     """Dispatch an event to all registered webhooks that subscribe to it.
 
+    Checks both API-registered webhooks and the WEBHOOK_URL env var.
     Fire-and-forget: delivery failures are logged, not raised.
     """
     webhooks = _read_webhooks()
+
+    # Include env-var-based webhook if configured (subscribes to all events)
+    cfg = Config()
+    if cfg.WEBHOOK_URL:
+        env_webhook = {"id": "__env__", "url": cfg.WEBHOOK_URL, "events": VALID_EVENTS}
+        if cfg.WEBHOOK_SECRET:
+            env_webhook["secret"] = cfg.WEBHOOK_SECRET
+        webhooks.append(env_webhook)
+
     matching = [w for w in webhooks if event in w.get("events", [])]
     if not matching:
         return

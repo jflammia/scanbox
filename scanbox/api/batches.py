@@ -13,6 +13,7 @@ from scanbox.api.scanning import (
     scan_backs_task,
     scan_fronts_task,
 )
+from scanbox.api.webhooks import dispatch_webhook_event
 from scanbox.config import Config
 from scanbox.main import get_db
 from scanbox.models import SplitDocument
@@ -247,13 +248,26 @@ async def save_batch(batch_id: str):
 
     await db.update_batch_state(batch_id, "saved")
 
-    return {
+    result = {
         "status": "saved",
         "archive_path": str(archive_path),
         "medical_records": medical_records,
         "paperless_ids": paperless_ids,
         "index_csv": str(index_csv_path),
     }
+
+    await dispatch_webhook_event(
+        "save.completed",
+        {
+            "batch_id": batch_id,
+            "documents_saved": len(documents),
+            "archive_path": str(archive_path),
+            "medical_records": medical_records,
+            "paperless_ids": paperless_ids,
+        },
+    )
+
+    return result
 
 
 @router.get("/api/batches/{batch_id}/pages/{page_num}/thumbnail")

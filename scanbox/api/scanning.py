@@ -12,6 +12,7 @@ from pathlib import Path
 import pikepdf
 
 from scanbox.api.sse import event_bus
+from scanbox.api.webhooks import dispatch_webhook_event
 from scanbox.config import Config
 from scanbox.database import Database
 from scanbox.models import SplitDocument
@@ -66,6 +67,10 @@ async def scan_fronts_task(batch_id: str, db: Database) -> None:
             batch_id,
             {"type": "scan_complete", "side": "fronts", "pages": page_count},
         )
+        await dispatch_webhook_event(
+            "scan.completed",
+            {"batch_id": batch_id, "side": "fronts", "page_count": page_count},
+        )
     except Exception as e:
         logger.exception("Front scan failed for batch %s", batch_id)
         await db.update_batch_state(batch_id, "error", error_message=str(e))
@@ -93,6 +98,10 @@ async def scan_backs_task(batch_id: str, db: Database) -> None:
         await event_bus.publish(
             batch_id,
             {"type": "scan_complete", "side": "backs", "pages": page_count},
+        )
+        await dispatch_webhook_event(
+            "scan.completed",
+            {"batch_id": batch_id, "side": "backs", "page_count": page_count},
         )
 
         # Trigger pipeline processing
@@ -143,6 +152,10 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
             batch_id,
             {"type": "progress", "stage": stage_name, "detail": detail},
         )
+        await dispatch_webhook_event(
+            "processing.stage_completed",
+            {"batch_id": batch_id, "stage": stage_name, "detail": detail},
+        )
 
     documents: list[SplitDocument] = await run_pipeline(ctx, on_progress=on_progress)
 
@@ -164,3 +177,35 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
 
     await db.update_batch_state(batch_id, "review")
     await event_bus.publish(batch_id, {"type": "done", "document_count": len(documents)})
+
+    # Dispatch webhook for processing completion
+    doc_summaries = [
+        {
+            "document_type": doc.document_type,
+            "date_of_service": doc.date_of_service,
+            "confidence": doc.confidence,
+        }
+        for doc in documents
+    ]
+    await dispatch_webhook_event(
+        "processing.completed",
+        {
+            "batch_id": batch_id,
+            "document_count": len(documents),
+            "documents": doc_summaries,
+        },
+    )
+
+    # Flag low-confidence documents for review
+    for doc in documents:
+        if doc.confidence < 0.7:
+            await dispatch_webhook_event(
+                "review.needed",
+                {
+                    "batch_id": batch_id,
+                    "document_type": doc.document_type,
+                    "confidence": doc.confidence,
+                    "start_page": doc.start_page,
+                    "end_page": doc.end_page,
+                },
+            )
