@@ -8,7 +8,7 @@ ScanBox is a **fully implemented** self-hosted Docker application that controls 
 
 **Three interfaces, one backend:**
 - **REST API** (`/api/*`) — primary interface with OpenAPI docs at `/api/docs`
-- **MCP Server** (`/mcp`) — 17 tools for AI agent integration, enabled via `MCP_ENABLED=true`
+- **MCP Server** (`/mcp`) — 20 tools for AI agent integration, enabled via `MCP_ENABLED=true`
 - **Web UI** (`/`) — htmx + Alpine.js wizard-guided workflow
 
 ## Source Layout
@@ -181,7 +181,7 @@ pdf.save(buf)
 |----------|---------|
 | `docs/design.md` | **Single source of truth** — behavior, architecture, error handling |
 | `docs/api-spec.md` | REST API reference — all endpoints with examples |
-| `docs/mcp-server.md` | MCP server — 17 tools, 2 resources, 2 prompts |
+| `docs/mcp-server.md` | MCP server — 20 tools, 2 resources, 4 prompts |
 | `docs/ui-spec.md` | Visual design — components, layouts, accessibility |
 | `docs/plans/2026-03-28-scanbox-implementation.md` | Original implementation plan (all tasks complete) |
 

@@ -7,6 +7,7 @@ import pytest
 from scanbox.mcp.server import (
     scanbox_adjust_boundaries,
     scanbox_create_session,
+    scanbox_diagnose_system,
     scanbox_get_batch_status,
     scanbox_get_document,
     scanbox_get_pipeline_status,
@@ -19,7 +20,9 @@ from scanbox.mcp.server import (
     scanbox_save_batch,
     scanbox_scan_backs,
     scanbox_scan_fronts,
+    scanbox_setup_guide,
     scanbox_skip_backs,
+    scanbox_test_connection,
     scanbox_update_document,
 )
 
@@ -187,3 +190,109 @@ class TestSave:
         mock_client.post.return_value = _mock_response({"status": "saved"})
         result = await scanbox_save_batch(batch_id="b1")
         assert result["status"] == "saved"
+
+
+class TestSetupGuide:
+    async def test_setup_guide_initial(self, mock_client):
+        mock_client.get.return_value = _mock_response(
+            {"completed": False, "current_step": 1, "total_steps": 6}
+        )
+        result = await scanbox_setup_guide()
+        assert result["setup_completed"] is False
+        assert "steps" in result
+        assert len(result["steps"]) > 0
+
+    async def test_setup_guide_completed(self, mock_client):
+        mock_client.get.return_value = _mock_response(
+            {"completed": True, "current_step": 6, "total_steps": 6}
+        )
+        result = await scanbox_setup_guide()
+        assert result["setup_completed"] is True
+
+
+class TestTestConnection:
+    async def test_scanner_connection(self, mock_client):
+        mock_client.post.return_value = _mock_response(
+            {"success": True, "model": "HP LaserJet", "message": "Scanner connected"}
+        )
+        result = await scanbox_test_connection(service="scanner")
+        assert result["success"] is True
+        assert result["service"] == "scanner"
+
+    async def test_llm_connection(self, mock_client):
+        mock_client.post.return_value = _mock_response(
+            {"success": True, "provider": "anthropic", "message": "LLM provider connected"}
+        )
+        result = await scanbox_test_connection(service="llm")
+        assert result["success"] is True
+        assert result["service"] == "llm"
+
+    async def test_paperless_connection(self, mock_client):
+        mock_client.post.return_value = _mock_response(
+            {"success": True, "message": "Connected to PaperlessNGX"}
+        )
+        result = await scanbox_test_connection(service="paperless")
+        assert result["success"] is True
+
+    async def test_all_connections(self, mock_client):
+        mock_client.post.side_effect = [
+            _mock_response({"success": True, "message": "Scanner connected"}),
+            _mock_response({"success": True, "message": "LLM provider connected"}),
+            _mock_response({"success": False, "message": "PaperlessNGX not configured."}),
+        ]
+        result = await scanbox_test_connection(service="all")
+        assert "scanner" in result
+        assert "llm" in result
+        assert "paperless" in result
+
+    async def test_invalid_service(self, mock_client):
+        result = await scanbox_test_connection(service="invalid")
+        assert "error" in result
+
+
+class TestDiagnoseSystem:
+    async def test_diagnose_system(self, mock_client):
+        mock_client.get.side_effect = [
+            # health check
+            _mock_response(
+                {
+                    "status": "ok",
+                    "api": "ok",
+                    "database": "ok",
+                    "scanner": "ok",
+                    "storage": {"internal": "ok", "output": "ok"},
+                    "llm": {"provider": "anthropic", "configured": True},
+                    "paperless": {"configured": False},
+                }
+            ),
+            # setup status
+            _mock_response({"completed": True, "current_step": 6, "total_steps": 6}),
+            # sessions
+            _mock_response({"items": [{"id": "s1"}, {"id": "s2"}]}),
+        ]
+        result = await scanbox_diagnose_system()
+        assert "health" in result
+        assert "setup" in result
+        assert "summary" in result
+        assert result["session_count"] == 2
+
+    async def test_diagnose_with_issues(self, mock_client):
+        mock_client.get.side_effect = [
+            _mock_response(
+                {
+                    "status": "degraded",
+                    "api": "ok",
+                    "database": "error",
+                    "scanner": "unreachable",
+                    "storage": {"internal": "ok", "output": "missing"},
+                    "llm": {"provider": "anthropic", "configured": False},
+                    "paperless": {"configured": False},
+                }
+            ),
+            _mock_response({"completed": False, "current_step": 1, "total_steps": 6}),
+            _mock_response({"items": []}),
+        ]
+        result = await scanbox_diagnose_system()
+        assert len(result["issues"]) > 0
+        assert any("database" in issue.lower() for issue in result["issues"])
+        assert any("scanner" in issue.lower() for issue in result["issues"])
