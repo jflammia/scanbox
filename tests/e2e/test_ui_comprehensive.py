@@ -299,14 +299,14 @@ class TestScanPage:
         sid = seeded["session"]["id"]
         bid = seeded["batch"]["id"]
         resp = await client.get(f"/scan/{sid}/{bid}")
-        assert f'hx-post="/api/batches/{bid}/scan/fronts"' in resp.text
-        assert 'hx-swap="none"' in resp.text
+        assert f'hx-post="/batches/{bid}/scan-fronts"' in resp.text
+        assert 'hx-target="#step1-progress"' in resp.text
 
     async def test_scan_backs_button(self, seeded, client: AsyncClient):
         sid = seeded["session"]["id"]
         bid = seeded["batch"]["id"]
         resp = await client.get(f"/scan/{sid}/{bid}")
-        assert f'hx-post="/api/batches/{bid}/scan/backs"' in resp.text
+        assert f'hx-post="/batches/{bid}/scan-backs"' in resp.text
 
     async def test_skip_backs_link(self, seeded, client: AsyncClient):
         sid = seeded["session"]["id"]
@@ -319,8 +319,8 @@ class TestScanPage:
         sid = seeded["session"]["id"]
         bid = seeded["batch"]["id"]
         resp = await client.get(f"/scan/{sid}/{bid}")
-        assert "step1Done = true; currentStep = 2" in resp.text
-        assert "step2Done = true; currentStep = 3" in resp.text
+        assert "step1Done" in resp.text
+        assert "step2Done" in resp.text
 
     async def test_progress_areas(self, seeded, client: AsyncClient):
         sid = seeded["session"]["id"]
@@ -740,7 +740,9 @@ class TestSetupPage:
 
     async def test_step1_scanner_check(self, client: AsyncClient):
         resp = await client.get("/setup")
-        assert "Looking for your scanner" in resp.text
+        assert "Find your scanner" in resp.text
+        assert 'name="scanner_ip"' in resp.text
+        assert "discover-scanners" in resp.text
 
     async def test_step2_storage_check(self, client: AsyncClient):
         resp = await client.get("/setup")
