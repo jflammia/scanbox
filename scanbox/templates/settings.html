@@ -38,13 +38,18 @@
 
     <section class="bg-surface-raised border border-border rounded-lg p-6">
       <h2 class="text-xl font-semibold mb-4">Scanner</h2>
-      <p class="text-text-secondary">
-        {% if scanner_ip %}
-        Connected to scanner at <code class="font-mono text-sm">{{ scanner_ip }}</code>
-        {% else %}
-        No scanner configured. Set the <code class="font-mono text-sm">SCANNER_IP</code> environment variable.
-        {% endif %}
-      </p>
+      <form class="space-y-3" hx-post="/settings/scanner" hx-target="#scanner-result" hx-swap="innerHTML">
+        <label class="block text-sm text-text-secondary">Scanner IP address</label>
+        <div class="flex gap-2">
+          <input type="text" name="scanner_ip" value="{{ scanner_ip }}" placeholder="e.g. 192.168.1.100"
+                 class="flex-1 border border-border rounded-md px-4 py-2 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <button type="submit"
+                  class="px-4 py-2 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700">
+            Save
+          </button>
+        </div>
+        <div id="scanner-result"></div>
+      </form>
     </section>
 
     <section class="bg-surface-raised border border-border rounded-lg p-6">

@@ -1,15 +1,29 @@
 """Configuration loaded from environment variables with sensible defaults."""
 
+import json
 import os
 from pathlib import Path
+
+
+def _read_runtime_config() -> dict:
+    """Read user-configured settings from runtime.json (set via the UI)."""
+    path = Path(os.getenv("INTERNAL_DATA_DIR", "/app/data")) / "config" / "runtime.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
 
 
 class Config:
     """Reads environment variables at instantiation time, not import time."""
 
     def __init__(self) -> None:
-        # Scanner
-        self.SCANNER_IP: str = os.getenv("SCANNER_IP", "")
+        runtime = _read_runtime_config()
+
+        # Scanner — runtime config takes priority over env var
+        self.SCANNER_IP: str = runtime.get("scanner_ip") or os.getenv("SCANNER_IP", "")
 
         # LLM
         self.LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic")
