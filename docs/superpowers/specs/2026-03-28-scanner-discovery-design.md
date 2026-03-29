@@ -33,6 +33,7 @@ class DiscoveredScanner:
     model: str          # from TXT record "ty" field
     base_path: str      # from TXT record "rs" field (usually "eSCL")
     uuid: str           # from TXT record "UUID" field
+    icon_url: str       # from TXT record "representation" field (device image URL)
     secure: bool        # True if discovered via _uscans._tcp
 
 async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]
@@ -41,7 +42,7 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]
 Implementation:
 - Creates `AsyncZeroconf(ip_version=IPVersion.V4Only)`
 - Browses `_uscan._tcp.local.` and `_uscans._tcp.local.` with `AsyncServiceBrowser`
-- Resolves each found service with `AsyncServiceInfo` to extract IP, port, and TXT record fields
+- Resolves each found service with `AsyncServiceInfo` to extract IP, port, and TXT record fields (including `representation` for the device icon URL)
 - Waits for `timeout` seconds, then cancels browser and closes zeroconf
 - Returns deduplicated list (by UUID) of found scanners
 - Returns empty list if nothing found — no fallback, no subnet probe
@@ -71,6 +72,7 @@ Canonical discovery endpoint. Also serves as "rescan."
       "model": "HP Color LaserJet MFP M283cdw",
       "name": "HP Color LaserJet MFP M283cdw._uscan._tcp.local.",
       "uuid": "1c852a4d-b800-1f08-abcd-843497f7816c",
+      "icon_url": "http://192.168.10.11/images/printer.png",
       "secure": false
     }
   ],
@@ -97,7 +99,7 @@ Runs 4-step verification checklist on a scanner IP, returns HTML with results.
 **Verification checks (sequential):**
 1. **Reaching scanner** — TCP connect to IP on port 80 (default eSCL port)
 2. **eSCL protocol** — `GET /eSCL/ScannerStatus` returns 200
-3. **Scanner capabilities** — `GET /eSCL/ScannerCapabilities` parses, has ADF
+3. **Scanner capabilities** — `GET /eSCL/ScannerCapabilities` parses, has ADF. Extracts `IconURI` if present for display.
 4. **Scanner ready** — Status is Idle
 
 **HTML response — all pass:**
@@ -149,11 +151,15 @@ On full success, saves `scanner_ip` to `runtime.json` before returning.
 
 Thin HTML wrapper around the discovery service. Returns scanner cards or the container networking hint. No longer does subnet probing.
 
+### Minor Update: ScannerCapabilities Dataclass
+
+Add `icon_url: str = ""` field to `scanbox/scanner/models.py:ScannerCapabilities`. Parse `IconURI` from the ScannerCapabilities XML in `parse_capabilities()`. This allows both discovered and manually-entered scanners to show their device image.
+
 ### Kept Unchanged
 - `POST /setup/test-scanner` (HTML) — saves IP, tests connectivity
 - `POST /api/setup/test-scanner` (JSON) — tests configured scanner
 - `GET /api/scanner/status` — scanner status
-- `GET /api/scanner/capabilities` — scanner capabilities
+- `GET /api/scanner/capabilities` — scanner capabilities (response now includes `icon_url`)
 
 ## MCP Tools
 
@@ -202,7 +208,7 @@ Used across API JSON responses, MCP tool returns, and UI display:
 
 **Behavior:**
 - On page load: triggers `POST /setup/discover-scanners` (htmx `hx-trigger="load"`)
-- Discovered scanners shown as clickable cards (name + model + IP)
+- Discovered scanners shown as clickable cards with device image (from `icon_url`), model name, and IP address. Falls back to the printer emoji if no icon URL is available.
 - Clicking a card fills the IP field and submits the verify form
 - Manual IP entry + "Verify" button submits to `POST /setup/verify-scanner`
 - Verification checklist renders inline with pass/fail indicators
