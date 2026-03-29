@@ -49,18 +49,17 @@ class TestScanWizardHtmlResponses:
         assert resp.status_code == 200
         assert "Scan Front Sides" in resp.text
 
-    async def test_scan_buttons_use_swap_none(self, client: AsyncClient):
-        """Scan front/back buttons should use hx-swap='none' not innerHTML."""
+    async def test_scan_buttons_target_progress(self, client: AsyncClient):
+        """Scan front/back buttons should target progress divs for feedback."""
         person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
         resp = await client.get(f"/scan/{session['id']}/{batch['id']}")
         html = resp.text
-        # Scan front/back buttons should use hx-swap="none"
-        assert "scan/fronts" in html
-        assert "scan/backs" in html
-        # Verify the scan buttons have hx-swap="none"
-        assert html.count('hx-swap="none"') >= 3  # fronts, backs, skip-backs
+        assert "scan-fronts" in html
+        assert "scan-backs" in html
+        assert 'hx-target="#step1-progress"' in html
+        assert 'hx-target="#step2-progress"' in html
 
 
 class TestScannerStatusBar:

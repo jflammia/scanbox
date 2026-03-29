@@ -298,3 +298,146 @@ async def settings_scanner(scanner_ip: str = Form("")):
     if scanner_ip.strip():
         return HTMLResponse('<p class="text-status-success font-medium mt-2">Scanner IP saved.</p>')
     return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')
+
+
+@router.post("/batches/{batch_id}/scan-fronts", response_class=HTMLResponse)
+async def scan_fronts_html(batch_id: str):
+    """Start scanning front sides, returning HTML progress feedback."""
+    import asyncio
+
+    from scanbox.api.scanning import scan_fronts_task
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        return HTMLResponse(
+            '<p class="text-status-error font-medium">Batch not found.</p>',
+            status_code=404,
+        )
+
+    cfg = Config()
+    if not cfg.SCANNER_IP:
+        return HTMLResponse(
+            '<p class="text-status-error font-medium">'
+            "No scanner configured. Go to Settings to add your scanner's IP address.</p>",
+            status_code=422,
+        )
+
+    if batch["state"] != "scanning_fronts":
+        return HTMLResponse(
+            f'<p class="text-status-error font-medium">'
+            f"Can't scan right now (status: {batch['state']}).</p>",
+            status_code=409,
+        )
+
+    asyncio.create_task(scan_fronts_task(batch_id, db))
+    return HTMLResponse(
+        '<div class="flex items-center gap-2 text-brand-600 font-medium">'
+        '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
+        'rounded-full animate-spin"></div>'
+        f"Scanning... This may take a moment.</div>"
+        f'<div hx-get="/batches/{batch_id}/scan-status" hx-trigger="every 2s" '
+        f'hx-target="#step1-progress" hx-swap="innerHTML"></div>'
+    )
+
+
+@router.get("/batches/{batch_id}/scan-status", response_class=HTMLResponse)
+async def scan_status_html(batch_id: str):
+    """Poll batch state and return HTML indicating scan progress."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        return HTMLResponse('<p class="text-status-error">Batch not found.</p>')
+
+    state = batch["state"]
+    if state == "scanning_fronts":
+        return HTMLResponse(
+            '<div class="flex items-center gap-2 text-brand-600 font-medium">'
+            '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
+            'rounded-full animate-spin"></div>'
+            "Scanning... This may take a moment.</div>"
+            f'<div hx-get="/batches/{batch_id}/scan-status" hx-trigger="every 2s" '
+            f'hx-target="#step1-progress" hx-swap="innerHTML"></div>'
+        )
+    if state in ("fronts_done", "scanning_backs", "backs_done", "processing", "review", "saved"):
+        return HTMLResponse(
+            '<p class="text-status-success font-medium" '
+            'x-init="step1Done = true; currentStep = 2">'
+            "Front sides scanned!</p>"
+        )
+    # Error or unexpected state
+    return HTMLResponse(
+        f'<p class="text-status-error font-medium">'
+        f"Scanning stopped unexpectedly (status: {state}).</p>"
+    )
+
+
+@router.post("/batches/{batch_id}/scan-backs", response_class=HTMLResponse)
+async def scan_backs_html(batch_id: str):
+    """Start scanning back sides, returning HTML progress feedback."""
+    import asyncio
+
+    from scanbox.api.scanning import scan_backs_task
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        return HTMLResponse(
+            '<p class="text-status-error font-medium">Batch not found.</p>',
+            status_code=404,
+        )
+
+    cfg = Config()
+    if not cfg.SCANNER_IP:
+        return HTMLResponse(
+            '<p class="text-status-error font-medium">'
+            "No scanner configured. Go to Settings to add your scanner's IP address.</p>",
+            status_code=422,
+        )
+
+    if batch["state"] != "fronts_done":
+        return HTMLResponse(
+            f'<p class="text-status-error font-medium">'
+            f"Can't scan backs right now (status: {batch['state']}).</p>",
+            status_code=409,
+        )
+
+    asyncio.create_task(scan_backs_task(batch_id, db))
+    return HTMLResponse(
+        '<div class="flex items-center gap-2 text-brand-600 font-medium">'
+        '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
+        'rounded-full animate-spin"></div>'
+        f"Scanning backs...</div>"
+        f'<div hx-get="/batches/{batch_id}/scan-back-status" hx-trigger="every 2s" '
+        f'hx-target="#step2-progress" hx-swap="innerHTML"></div>'
+    )
+
+
+@router.get("/batches/{batch_id}/scan-back-status", response_class=HTMLResponse)
+async def scan_back_status_html(batch_id: str):
+    """Poll batch state for back scanning progress."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        return HTMLResponse('<p class="text-status-error">Batch not found.</p>')
+
+    state = batch["state"]
+    if state in ("scanning_backs", "fronts_done"):
+        return HTMLResponse(
+            '<div class="flex items-center gap-2 text-brand-600 font-medium">'
+            '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
+            'rounded-full animate-spin"></div>'
+            "Scanning backs...</div>"
+            f'<div hx-get="/batches/{batch_id}/scan-back-status" hx-trigger="every 2s" '
+            f'hx-target="#step2-progress" hx-swap="innerHTML"></div>'
+        )
+    if state in ("backs_done", "processing", "review", "saved"):
+        return HTMLResponse(
+            '<p class="text-status-success font-medium" '
+            'x-init="step2Done = true; currentStep = 3">'
+            "Back sides scanned!</p>"
+        )
+    return HTMLResponse(
+        f'<p class="text-status-error font-medium">'
+        f"Scanning stopped unexpectedly (status: {state}).</p>"
+    )
