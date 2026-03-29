@@ -30,29 +30,13 @@ Built for scanning hundreds of medical records, tax documents, or any mixed stac
 
 ## Screenshots
 
-<!--
-  TO ADD SCREENSHOTS:
-  1. Run ScanBox locally: docker compose up
-  2. Capture screenshots at 1280x800 (full page) or 800x500 (cropped)
-  3. Save as PNG to docs/images/
-  4. Uncomment the table rows below
-
-  Recommended screenshots:
-  - screenshot-scan.png        → Scanning wizard (step 1 or 2)
-  - screenshot-review.png      → Results page with document cards
-  - screenshot-boundaries.png  → Boundary editor with thumbnail strip
-  - screenshot-cards.png       → Close-up of document cards with metadata
-  - screenshot-setup.png       → First-run setup wizard
-  - screenshot-status.png      → Scanner status indicator
--->
-
 | Scanning Wizard | Review & Edit | Boundary Editor |
 |:---:|:---:|:---:|
 | ![Scanning wizard](docs/images/screenshot-scan.png) | ![Review results](docs/images/screenshot-review.png) | ![Boundary editor](docs/images/screenshot-boundaries.png) |
 
-| Document Cards | Setup Wizard | Scanner Status |
+| Document Cards | Setup Wizard | Settings |
 |:---:|:---:|:---:|
-| ![Document cards](docs/images/screenshot-cards.png) | ![Setup wizard](docs/images/screenshot-setup.png) | ![Scanner status](docs/images/screenshot-status.png) |
+| ![Document cards](docs/images/screenshot-cards.png) | ![Setup wizard](docs/images/screenshot-setup.png) | ![Settings](docs/images/screenshot-status.png) |
 
 ## Features
 
