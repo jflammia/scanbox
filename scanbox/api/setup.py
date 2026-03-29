@@ -89,18 +89,17 @@ async def discover_scanners():
     import httpx
 
     found: list[dict] = []
-    sem = asyncio.Semaphore(20)
+    sem = asyncio.Semaphore(30)
 
     async def probe(ip: str, client: httpx.AsyncClient):
         async with sem:
             try:
-                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=3.0)
+                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=2.0)
                 if resp.status_code == 200:
-                    # Try to get the model name from ScannerCapabilities
                     name = ip
                     try:
                         caps = await client.get(
-                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=3.0
+                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=2.0
                         )
                         if caps.status_code == 200:
                             root = ET.fromstring(caps.text)
@@ -114,12 +113,36 @@ async def discover_scanners():
             except Exception:
                 pass
 
-    # Probe common home network subnets (20 concurrent, 3s timeout)
-    subnets = ["192.168.1", "192.168.0", "192.168.10", "192.168.2", "10.0.0", "10.0.1"]
-    ips = [f"{subnet}.{host}" for subnet in subnets for host in range(1, 255)]
-
+    # Detect which LAN subnet is reachable by probing common gateway IPs
+    all_subnets = [
+        "192.168.1",
+        "192.168.10",
+        "192.168.0",
+        "192.168.2",
+        "192.168.86",
+        "10.0.0",
+        "10.0.1",
+    ]
+    reachable_subnets: list[str] = []
     async with httpx.AsyncClient() as client:
-        await asyncio.gather(*(probe(ip, client) for ip in ips))
+        for subnet in all_subnets:
+            try:
+                await client.get(f"http://{subnet}.1", timeout=0.5)
+                reachable_subnets.append(subnet)
+            except httpx.ConnectTimeout:
+                pass
+            except Exception:
+                # Got a response (even an error) — subnet is routable
+                reachable_subnets.append(subnet)
+
+    # Scan reachable subnets first, then remaining
+    ordered = reachable_subnets + [s for s in all_subnets if s not in reachable_subnets]
+    for subnet in ordered:
+        ips = [f"{subnet}.{host}" for host in range(1, 255)]
+        async with httpx.AsyncClient() as client:
+            await asyncio.gather(*(probe(ip, client) for ip in ips))
+        if found:
+            break  # Found scanner(s), no need to scan more subnets
 
     if found:
         cards = ""
