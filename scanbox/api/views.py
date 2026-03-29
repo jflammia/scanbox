@@ -300,6 +300,110 @@ async def settings_scanner(scanner_ip: str = Form("")):
     return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')
 
 
+_SPINNER = (
+    '<div class="w-4 h-4 border-2 border-brand-300 border-t-brand-600 '
+    'rounded-full animate-spin inline-block"></div>'
+)
+_CHECK = '<span class="text-status-success font-bold">&#10003;</span>'
+_ERROR_ICON = '<span class="text-status-error font-bold">&#10007;</span>'
+
+_STAGE_LABELS: dict[str, str] = {
+    "interleave": "Merging front and back sides...",
+    "blank_detect": "Removing blank pages...",
+    "ocr": "Running text recognition...",
+    "split": "Identifying document boundaries...",
+    "name": "Generating filenames...",
+    "output": "Writing output files...",
+}
+
+
+def _friendly_error(msg: str) -> str:
+    """Convert a technical error message to plain English."""
+    lower = msg.lower()
+    if "authenticationerror" in lower or "api key" in lower or "authentication" in lower:
+        return "No AI service configured. Add your API key in Settings."
+    if "connecterror" in lower or "unreachable" in lower or "connection refused" in lower:
+        return "Lost connection to the scanner. Is it still on?"
+    if "timeout" in lower or "timed out" in lower:
+        return "The operation timed out. Please try again."
+    # Strip Python exception class prefix (e.g. "ValueError: something" → "something")
+    if ": " in msg:
+        return msg.split(": ", 1)[1]
+    return msg
+
+
+def _render_progress_event(event: dict, batch_id: str) -> str:
+    """Map an event dict to an HTML fragment string."""
+    etype = event.get("type", "")
+
+    if etype == "progress":
+        stage = event.get("stage", "")
+        label = _STAGE_LABELS.get(stage, "Processing...")
+        return (
+            f'<div class="flex items-center gap-2 text-brand-600 font-medium">'
+            f"{_SPINNER} {label}</div>"
+        )
+
+    if etype == "page_scanned":
+        page = event.get("page", "?")
+        return f'<div class="ml-4 text-text-secondary text-sm">Page {page} scanned</div>'
+
+    if etype == "scan_complete":
+        count = event.get("count", 0)
+        return (
+            f'<div class="flex items-center gap-2 font-medium">'
+            f"{_CHECK} Scanned {count} pages</div>"
+            f'<span x-init="step1Done = true; currentStep = 2" class="hidden"></span>'
+        )
+
+    if etype == "stage_complete":
+        stage = event.get("stage", "")
+        detail = event.get("detail", "")
+        label = _STAGE_LABELS.get(stage, stage)
+        detail_html = f" — {detail}" if detail else ""
+        return (
+            f'<div class="flex items-center gap-2 font-medium">{_CHECK} {label}{detail_html}</div>'
+        )
+
+    if etype == "done":
+        count = event.get("count", 0)
+        return (
+            f'<div class="flex items-center gap-2 font-medium text-status-success">'
+            f"{_CHECK} All done! {count} document{'s' if count != 1 else ''} ready for review</div>"
+            f'<a href="/results/{batch_id}" class="underline text-brand-600">'
+            f"Review documents</a>"
+        )
+
+    if etype == "error":
+        raw = event.get("message", "An unexpected error occurred.")
+        friendly = _friendly_error(raw)
+        return (
+            f'<div class="flex items-center gap-2 font-medium text-status-error">'
+            f"{_ERROR_ICON} {friendly}</div>"
+            f'<a href="/" class="underline text-brand-600">Back to Home</a>'
+        )
+
+    return ""
+
+
+@router.get("/batches/{batch_id}/progress", response_class=HTMLResponse)
+async def batch_progress_sse(batch_id: str):
+    """SSE stream of HTML progress fragments for the scan wizard."""
+    from starlette.responses import StreamingResponse
+
+    from scanbox.api.sse import event_bus
+
+    async def generate():
+        async for event in event_bus.subscribe(batch_id):
+            html = _render_progress_event(event, batch_id)
+            if html:
+                yield f"data: {html}\n\n"
+            if event.get("type") in ("done", "error"):
+                break
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
 @router.post("/batches/{batch_id}/scan-fronts", response_class=HTMLResponse)
 async def scan_fronts_html(batch_id: str):
     """Start scanning front sides, returning HTML progress feedback."""
@@ -332,43 +436,8 @@ async def scan_fronts_html(batch_id: str):
 
     asyncio.create_task(scan_fronts_task(batch_id, db))
     return HTMLResponse(
-        '<div class="flex items-center gap-2 text-brand-600 font-medium">'
-        '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
-        'rounded-full animate-spin"></div>'
-        f"Scanning... This may take a moment.</div>"
-        f'<div hx-get="/batches/{batch_id}/scan-status" hx-trigger="every 2s" '
-        f'hx-target="#step1-progress" hx-swap="innerHTML"></div>'
-    )
-
-
-@router.get("/batches/{batch_id}/scan-status", response_class=HTMLResponse)
-async def scan_status_html(batch_id: str):
-    """Poll batch state and return HTML indicating scan progress."""
-    db = get_db()
-    batch = await db.get_batch(batch_id)
-    if not batch:
-        return HTMLResponse('<p class="text-status-error">Batch not found.</p>')
-
-    state = batch["state"]
-    if state == "scanning_fronts":
-        return HTMLResponse(
-            '<div class="flex items-center gap-2 text-brand-600 font-medium">'
-            '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
-            'rounded-full animate-spin"></div>'
-            "Scanning... This may take a moment.</div>"
-            f'<div hx-get="/batches/{batch_id}/scan-status" hx-trigger="every 2s" '
-            f'hx-target="#step1-progress" hx-swap="innerHTML"></div>'
-        )
-    if state in ("fronts_done", "scanning_backs", "backs_done", "processing", "review", "saved"):
-        return HTMLResponse(
-            '<p class="text-status-success font-medium" '
-            'x-init="step1Done = true; currentStep = 2">'
-            "Front sides scanned!</p>"
-        )
-    # Error or unexpected state
-    return HTMLResponse(
-        f'<p class="text-status-error font-medium">'
-        f"Scanning stopped unexpectedly (status: {state}).</p>"
+        f'<div hx-ext="sse" sse-connect="/batches/{batch_id}/progress" '
+        f'sse-swap="message" hx-swap="beforeend" class="space-y-1"></div>'
     )
 
 
@@ -404,40 +473,6 @@ async def scan_backs_html(batch_id: str):
 
     asyncio.create_task(scan_backs_task(batch_id, db))
     return HTMLResponse(
-        '<div class="flex items-center gap-2 text-brand-600 font-medium">'
-        '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
-        'rounded-full animate-spin"></div>'
-        f"Scanning backs...</div>"
-        f'<div hx-get="/batches/{batch_id}/scan-back-status" hx-trigger="every 2s" '
-        f'hx-target="#step2-progress" hx-swap="innerHTML"></div>'
-    )
-
-
-@router.get("/batches/{batch_id}/scan-back-status", response_class=HTMLResponse)
-async def scan_back_status_html(batch_id: str):
-    """Poll batch state for back scanning progress."""
-    db = get_db()
-    batch = await db.get_batch(batch_id)
-    if not batch:
-        return HTMLResponse('<p class="text-status-error">Batch not found.</p>')
-
-    state = batch["state"]
-    if state in ("scanning_backs", "fronts_done"):
-        return HTMLResponse(
-            '<div class="flex items-center gap-2 text-brand-600 font-medium">'
-            '<div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 '
-            'rounded-full animate-spin"></div>'
-            "Scanning backs...</div>"
-            f'<div hx-get="/batches/{batch_id}/scan-back-status" hx-trigger="every 2s" '
-            f'hx-target="#step2-progress" hx-swap="innerHTML"></div>'
-        )
-    if state in ("backs_done", "processing", "review", "saved"):
-        return HTMLResponse(
-            '<p class="text-status-success font-medium" '
-            'x-init="step2Done = true; currentStep = 3">'
-            "Back sides scanned!</p>"
-        )
-    return HTMLResponse(
-        f'<p class="text-status-error font-medium">'
-        f"Scanning stopped unexpectedly (status: {state}).</p>"
+        f'<div hx-ext="sse" sse-connect="/batches/{batch_id}/progress" '
+        f'sse-swap="message" hx-swap="beforeend" class="space-y-1"></div>'
     )
