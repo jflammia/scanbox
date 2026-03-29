@@ -115,16 +115,36 @@ Get the current scanner status with a human-readable message.
 
 **Input:** none
 
-**Output:**
+**Output (scanner reachable):**
 
 ```json
 {
   "scanner_ip": "192.168.1.100",
-  "message": "Scanner configured"
+  "status": "idle",
+  "adf_loaded": true,
+  "message": "Scanner ready — paper loaded in ADF"
 }
 ```
 
-Returns `"not configured"` for `scanner_ip` if `SCANNER_IP` is not set.
+**Output (scanner unreachable):**
+
+```json
+{
+  "scanner_ip": "192.168.1.100",
+  "status": "unreachable",
+  "message": "Can't reach the scanner. Is it turned on?"
+}
+```
+
+**Output (not configured):**
+
+```json
+{
+  "scanner_ip": "not configured",
+  "status": "not configured",
+  "message": "No scanner configured. Set the SCANNER_IP environment variable."
+}
+```
 
 ---
 

@@ -173,6 +173,9 @@ curl "http://localhost:8090/api/sessions?person_id=john-doe"
     {
       "id": "sess-abc123",
       "person_id": "john-doe",
+      "person_name": "John Doe",
+      "batch_count": 3,
+      "document_count": 12,
       "created": "2026-03-28T10:00:00-04:00"
     }
   ]
@@ -205,7 +208,21 @@ Create a batch separately with `POST /api/sessions/{session_id}/batches`.
 
 #### `GET /api/sessions/{session_id}`
 
-Get session details.
+Get session details with batches and person name.
+
+**Response:**
+
+```json
+{
+  "id": "sess-abc123",
+  "person_id": "john-doe",
+  "person_name": "John Doe",
+  "created": "2026-03-28T10:00:00Z",
+  "batches": [
+    {"id": "batch-001", "batch_num": 1, "state": "review", "...": "..."}
+  ]
+}
+```
 
 ---
 
@@ -352,9 +369,13 @@ List all documents in a batch.
       "user_edited": false,
       "filename": "2025-06-15_John-Doe_Radiology-Report_Memorial-Hospital_CT-Abdomen.pdf"
     }
-  ]
+  ],
+  "total": 12,
+  "needs_review": 1
 }
 ```
+
+`needs_review` counts documents with confidence below 0.7.
 
 #### `GET /api/documents/{document_id}`
 

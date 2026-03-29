@@ -4,6 +4,7 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 from scanbox.config import Config
+from scanbox.scanner.escl import ESCLClient
 
 mcp = FastMCP("scanbox")
 
@@ -28,12 +29,41 @@ async def scanbox_health_check() -> dict:
 
 @mcp.tool()
 async def scanbox_get_scanner_status() -> dict:
-    """Get the current scanner status with a human-readable message."""
+    """Get the current scanner status including connection state and ADF status."""
     cfg = Config()
-    return {
-        "scanner_ip": cfg.SCANNER_IP or "not configured",
-        "message": "Scanner configured" if cfg.SCANNER_IP else "No scanner configured",
-    }
+    if not cfg.SCANNER_IP:
+        return {
+            "scanner_ip": "not configured",
+            "status": "not configured",
+            "message": "No scanner configured. Set the SCANNER_IP environment variable.",
+        }
+
+    client = ESCLClient(cfg.SCANNER_IP)
+    try:
+        status = await client.get_status()
+        state = status.state.lower()
+        if state == "idle":
+            msg = "Scanner ready"
+            if status.adf_loaded:
+                msg += " — paper loaded in ADF"
+        elif state == "processing":
+            msg = "Scanner is busy processing a job"
+        else:
+            msg = f"Scanner state: {status.state}"
+        return {
+            "scanner_ip": cfg.SCANNER_IP,
+            "status": state,
+            "adf_loaded": status.adf_loaded,
+            "message": msg,
+        }
+    except Exception:
+        return {
+            "scanner_ip": cfg.SCANNER_IP,
+            "status": "unreachable",
+            "message": "Can't reach the scanner. Is it turned on?",
+        }
+    finally:
+        await client.close()
 
 
 # --- Persons ---

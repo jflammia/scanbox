@@ -22,12 +22,16 @@ class UpdateDocumentRequest(BaseModel):
     description: str | None = None
 
 
+REVIEW_CONFIDENCE_THRESHOLD = 0.7
+
+
 @router.get("/api/batches/{batch_id}/documents")
 async def list_documents(batch_id: str):
-    """List all documents in a batch."""
+    """List all documents in a batch with summary counts."""
     db = get_db()
     docs = await db.list_documents(batch_id)
-    return {"items": docs}
+    needs_review = sum(1 for d in docs if d.get("confidence", 1.0) < REVIEW_CONFIDENCE_THRESHOLD)
+    return {"items": docs, "total": len(docs), "needs_review": needs_review}
 
 
 @router.get("/api/documents/{document_id}")
