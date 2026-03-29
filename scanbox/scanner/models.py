@@ -12,6 +12,7 @@ class ScannerCapabilities:
     supported_formats: list[str] = field(default_factory=list)
     max_width: int = 2550  # US Letter at 300 DPI
     max_height: int = 3300
+    icon_url: str = ""
 
 
 @dataclass

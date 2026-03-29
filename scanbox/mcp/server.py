@@ -35,7 +35,8 @@ async def scanbox_get_scanner_status() -> dict:
         return {
             "scanner_ip": "not configured",
             "status": "not configured",
-            "message": "No scanner configured. Set the SCANNER_IP environment variable.",
+            "message": "No scanner configured. Use scanbox_discover_scanners() to find scanners "
+            "on your network, or set the IP manually via the Settings page.",
         }
 
     client = ESCLClient(cfg.SCANNER_IP)
@@ -64,6 +65,39 @@ async def scanbox_get_scanner_status() -> dict:
         }
     finally:
         await client.close()
+
+
+@mcp.tool()
+async def scanbox_discover_scanners(timeout: float = 5.0) -> dict:
+    """Scan the local network for eSCL/AirScan compatible scanners using mDNS discovery.
+
+    Returns a list of discovered scanners with their IP address, model name, and capabilities.
+    This is also the 'rescan' action — call again to re-run discovery.
+
+    Note: mDNS discovery requires the container to have direct LAN access
+    (Linux with network_mode: host or macvlan). On macOS or Docker bridge
+    networking, use manual IP configuration instead.
+    """
+    from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
+
+    clamped = min(max(timeout, 1.0), 30.0)
+    scanners = await discover_scanners(timeout=clamped)
+    return {
+        "scanners": [
+            {
+                "ip": s.ip,
+                "port": s.port,
+                "model": s.model,
+                "name": s.name,
+                "uuid": s.uuid,
+                "icon_url": s.icon_url,
+                "secure": s.secure,
+            }
+            for s in scanners
+        ],
+        "count": len(scanners),
+        "hint": DISCOVERY_HINT if not scanners else None,
+    }
 
 
 # --- Persons ---
@@ -268,9 +302,11 @@ async def scanbox_setup_guide() -> dict:
         {
             "step": 1,
             "name": "Scanner Connection",
-            "description": "Set the SCANNER_IP environment variable to your scanner's IP address. "
-            "The scanner must support eSCL/AirScan protocol. "
-            "You may need to enable WebScan in your printer's Embedded Web Server settings.",
+            "description": "Use scanbox_discover_scanners() to automatically find eSCL/AirScan "
+            "scanners on your network. If discovery finds nothing (common in Docker bridge "
+            "or macOS setups — mDNS requires Linux with network_mode: host), enter the "
+            "scanner's IP address manually in the Settings page. You can find the IP in "
+            "your scanner's network settings or your router's device list.",
             "test_command": "Use scanbox_test_connection(service='scanner') to verify.",
         },
         {
@@ -375,7 +411,10 @@ async def scanbox_diagnose_system() -> dict:
     # Check scanner
     scanner_status = health.get("scanner", "not configured")
     if scanner_status == "not configured":
-        issues.append("Scanner is not configured. Set the SCANNER_IP environment variable.")
+        issues.append(
+            "Scanner is not configured. Use scanbox_discover_scanners() to find scanners "
+            "on your network, or enter the IP manually in Settings."
+        )
     elif scanner_status == "unreachable":
         issues.append(
             "Scanner is unreachable. Check that the scanner is powered on, "

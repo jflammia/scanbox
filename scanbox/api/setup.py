@@ -1,6 +1,7 @@
 """First-run setup wizard API and page route."""
 
 import json
+import socket
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
@@ -81,91 +82,191 @@ async def setup_add_person(person_name: str = Form(...)):
 
 
 @router.post("/setup/discover-scanners", response_class=HTMLResponse)
-async def discover_scanners():
-    """Scan common subnets for eSCL scanners and return HTML results."""
-    import asyncio
-    import xml.etree.ElementTree as ET
+async def setup_discover_scanners():
+    """Discover scanners via mDNS and return HTML results."""
+    from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
 
-    import httpx
+    scanners = await discover_scanners(timeout=5.0)
 
-    found: list[dict] = []
-    sem = asyncio.Semaphore(30)
-
-    async def probe(ip: str, client: httpx.AsyncClient):
-        async with sem:
-            try:
-                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=2.0)
-                if resp.status_code == 200:
-                    name = ip
-                    try:
-                        caps = await client.get(
-                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=2.0
-                        )
-                        if caps.status_code == 200:
-                            root = ET.fromstring(caps.text)
-                            for el in root.iter():
-                                if el.tag.endswith("MakeAndModel") and el.text:
-                                    name = el.text
-                                    break
-                    except Exception:
-                        pass
-                    found.append({"ip": ip, "name": name})
-            except Exception:
-                pass
-
-    # Detect which LAN subnet is reachable by probing common gateway IPs
-    all_subnets = [
-        "192.168.1",
-        "192.168.10",
-        "192.168.0",
-        "192.168.2",
-        "192.168.86",
-        "10.0.0",
-        "10.0.1",
-    ]
-    reachable_subnets: list[str] = []
-    async with httpx.AsyncClient() as client:
-        for subnet in all_subnets:
-            try:
-                await client.get(f"http://{subnet}.1", timeout=0.5)
-                reachable_subnets.append(subnet)
-            except httpx.ConnectTimeout:
-                pass
-            except Exception:
-                # Got a response (even an error) — subnet is routable
-                reachable_subnets.append(subnet)
-
-    # Scan reachable subnets first, then remaining
-    ordered = reachable_subnets + [s for s in all_subnets if s not in reachable_subnets]
-    for subnet in ordered:
-        ips = [f"{subnet}.{host}" for host in range(1, 255)]
-        async with httpx.AsyncClient() as client:
-            await asyncio.gather(*(probe(ip, client) for ip in ips))
-        if found:
-            break  # Found scanner(s), no need to scan more subnets
-
-    if found:
+    if scanners:
         cards = ""
-        for s in found:
+        for s in scanners:
+            icon_html = (
+                f'<img src="{s.icon_url}" alt="" class="w-10 h-10 object-cover rounded">'
+                if s.icon_url
+                else '<div class="text-3xl">&#128424;</div>'
+            )
             cards += (
                 f'<button type="button" '
-                f"@click=\"$refs.scannerIp.value = '{s['ip']}'; "
-                f"$el.closest('form').requestSubmit()\" "
+                f"@click=\"$refs.scannerIp.value = '{s.ip}'; "
+                f"htmx.trigger($refs.verifyForm, 'submit')\" "
                 f'class="w-full text-left border border-border rounded-lg p-4 '
+                f"flex items-center gap-4 "
                 f'hover:border-brand-400 hover:bg-brand-50 transition-colors cursor-pointer">'
-                f'<p class="font-semibold">{s["name"]}</p>'
-                f'<p class="text-sm text-text-secondary">{s["ip"]}</p>'
+                f"{icon_html}"
+                f'<div><p class="font-semibold">{s.model}</p>'
+                f'<p class="text-sm text-text-secondary">{s.ip}</p></div>'
                 f"</button>"
             )
         return HTMLResponse(
             f'<div class="space-y-2">'
-            f'<p class="text-status-success font-medium">Found {len(found)} scanner(s)</p>'
+            f'<p class="text-status-success font-medium">Found {len(scanners)} scanner(s)</p>'
             f"{cards}</div>"
         )
-    return HTMLResponse(
-        '<p class="text-text-muted">No scanners found automatically. '
-        "Enter the IP address below.</p>"
-    )
+    return HTMLResponse(f'<p class="text-text-muted text-sm">{DISCOVERY_HINT}</p>')
+
+
+@router.post("/setup/verify-scanner", response_class=HTMLResponse)
+async def setup_verify_scanner(scanner_ip: str = Form("")):
+    """Run 4-step verification checklist on a scanner IP."""
+    import contextlib
+
+    scanner_ip = scanner_ip.strip()
+    if not scanner_ip:
+        return HTMLResponse(
+            '<p class="text-status-warning font-medium">Enter a scanner IP address.</p>'
+        )
+
+    from scanbox.scanner.escl import ESCLClient
+
+    checks: list[tuple[str, bool, str]] = []
+
+    # Check 1: TCP reachability
+    try:
+        sock = socket.create_connection((scanner_ip, 80), timeout=3)
+        sock.close()
+        checks.append(("Reaching scanner", True, ""))
+    except Exception:
+        checks.append(
+            (
+                "Reaching scanner",
+                False,
+                "Can't connect — is the scanner powered on and on your network?",
+            )
+        )
+        return _render_checklist(checks, scanner_ip)
+
+    # Check 2-4: eSCL protocol, capabilities, status
+    client = ESCLClient(scanner_ip)
+    try:
+        try:
+            status = await client.get_status()
+            checks.append(("eSCL protocol", True, ""))
+        except Exception:
+            checks.append(
+                (
+                    "eSCL protocol",
+                    False,
+                    "Scanner responded but doesn't support eSCL/AirScan",
+                )
+            )
+            return _render_checklist(checks, scanner_ip)
+
+        try:
+            caps = await client.get_capabilities()
+            if caps.has_adf:
+                checks.append(("Scanner capabilities", True, "ADF supported"))
+            else:
+                checks.append(
+                    (
+                        "Scanner capabilities",
+                        False,
+                        "No document feeder (ADF) detected",
+                    )
+                )
+                return _render_checklist(checks, scanner_ip)
+        except Exception:
+            checks.append(
+                (
+                    "Scanner capabilities",
+                    False,
+                    "Could not read scanner capabilities",
+                )
+            )
+            return _render_checklist(checks, scanner_ip)
+
+        if status.state.lower() == "idle":
+            checks.append(("Scanner ready", True, ""))
+        else:
+            checks.append(
+                (
+                    "Scanner ready",
+                    False,
+                    f"Scanner is busy ({status.state})",
+                )
+            )
+            return _render_checklist(checks, scanner_ip)
+    finally:
+        await client.close()
+
+    # All passed — save to runtime config
+    cfg = Config()
+    runtime_path = cfg.config_dir / "runtime.json"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    if runtime_path.exists():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            data = json.loads(runtime_path.read_text())
+    data["scanner_ip"] = scanner_ip
+    runtime_path.write_text(json.dumps(data))
+
+    model = caps.make_and_model or "Scanner"
+    icon_html = ""
+    if caps.icon_url:
+        icon_html = (
+            f'<img src="{caps.icon_url}" alt="{model}" class="w-10 h-10 object-cover rounded">'
+        )
+
+    return _render_checklist(checks, scanner_ip, model=model, icon_html=icon_html)
+
+
+def _render_checklist(
+    checks: list[tuple[str, bool, str]],
+    scanner_ip: str,
+    model: str = "",
+    icon_html: str = "",
+) -> HTMLResponse:
+    """Render the verification checklist as HTML."""
+    html = '<div class="space-y-2">'
+    all_passed = all(passed for _, passed, _ in checks)
+
+    for name, passed, detail in checks:
+        icon = "&#10003;" if passed else "&#10007;"
+        color = "text-status-success" if passed else "text-status-error"
+        detail_html = f' <span class="text-sm text-text-muted">— {detail}</span>' if detail else ""
+        html += (
+            f'<div class="flex items-center gap-2">'
+            f'<span class="{color} font-bold">{icon}</span> {name}{detail_html}'
+            f"</div>"
+        )
+
+    if all_passed:
+        html += (
+            f'<div class="flex items-center gap-3 mt-3">'
+            f"{icon_html}"
+            f'<p class="text-status-success font-semibold">'
+            f"Connected to {model} at {scanner_ip}</p>"
+            f"</div>"
+        )
+        html += "</div>"
+        html += '<div x-init="setTimeout(() => step = 2, 1500)"></div>'
+    else:
+        html += "</div>"
+        html += (
+            '<div class="flex gap-3 mt-4">'
+            '<button type="submit" '
+            'class="px-4 py-2 rounded-md bg-brand-600 text-white font-medium '
+            'hover:bg-brand-700">'
+            "Retry</button>"
+            '<button type="button" '
+            "@click=\"document.getElementById('scanner-verify-result')"
+            ".textContent = ''\" "
+            'class="px-4 py-2 rounded-md text-text-secondary hover:bg-gray-100">'
+            "Try a different scanner</button>"
+            "</div>"
+        )
+
+    return HTMLResponse(html)
 
 
 @router.post("/setup/test-scanner", response_class=HTMLResponse)

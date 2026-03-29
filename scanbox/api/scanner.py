@@ -1,8 +1,9 @@
 """Scanner status and capabilities API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from scanbox.config import Config
+from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
 from scanbox.scanner.escl import ESCLClient
 
 router = APIRouter(tags=["scanner"])
@@ -58,6 +59,29 @@ async def scanner_capabilities():
         ) from exc
     finally:
         await client.close()
+
+
+@router.post("/api/scanner/discover")
+async def scanner_discover(timeout: float = Query(default=5.0)):
+    """Discover eSCL scanners on the local network via mDNS."""
+    timeout = max(1.0, min(30.0, timeout))
+    scanners = await discover_scanners(timeout=timeout)
+    return {
+        "scanners": [
+            {
+                "ip": s.ip,
+                "port": s.port,
+                "model": s.model,
+                "name": s.name,
+                "uuid": s.uuid,
+                "icon_url": s.icon_url,
+                "secure": s.secure,
+            }
+            for s in scanners
+        ],
+        "count": len(scanners),
+        "hint": DISCOVERY_HINT if len(scanners) == 0 else None,
+    }
 
 
 def _status_message(state: str, adf_loaded: bool) -> str:

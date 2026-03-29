@@ -220,6 +220,7 @@ a:hover { color: var(--color-brand-700); }
 .hover\:border-brand-300:hover { border-color: var(--color-brand-300); }
 .hover\:border-brand-400:hover { border-color: var(--color-brand-400); }
 .hover\:text-text-primary:hover { color: var(--color-text-primary); }
+.hover\:text-text-secondary:hover { color: var(--color-text-secondary); }
 .hover\:text-brand-700:hover { color: var(--color-brand-700); }
 .hover\:shadow-md:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1); }
 

@@ -34,3 +34,6 @@ htmlcov/
 # Claude Code
 .claude/worktree-session
 .claude/settings.local.json
+
+# Worktrees
+.worktrees/

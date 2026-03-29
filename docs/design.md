@@ -165,6 +165,25 @@ The HP M283cdw supports eSCL (Apple AirScan) — a REST API over HTTP. ScanBox s
 | GET | `/eSCL/ScanJobs/{id}/NextDocument` | Retrieve each scanned page (loop until ADF is empty) |
 | DELETE | `/eSCL/ScanJobs/{id}` | Cancel a scan in progress |
 
+### Scanner Discovery
+
+ScanBox discovers eSCL scanners on the local network using mDNS/DNS-SD (RFC 6762/6763). Scanners advertise via two service types:
+
+- `_uscan._tcp.local.` — eSCL over HTTP
+- `_uscans._tcp.local.` — eSCL over HTTPS
+
+Discovery extracts TXT record fields: `ty` (model name), `rs` (base path), `UUID`, `representation` (device icon URL), `is` (input sources), `duplex`.
+
+**Container networking constraint:**
+
+| Platform | Network Mode | mDNS Works? |
+|----------|-------------|-------------|
+| Linux | `host` or `macvlan` | Yes |
+| Linux | `bridge` (default) | No — multicast filtered |
+| macOS/Windows | Any | No — VM doesn't forward multicast |
+
+**Recommendation:** Deploy on Linux with `network_mode: host` for automatic discovery. On macOS/Windows development setups, enter the scanner IP manually via Settings or the setup wizard.
+
 ### Live Scanner Health
 
 The web UI continuously monitors the printer and shows its status:
