@@ -107,17 +107,13 @@ Note: `ghostscript` is a new requirement for ocrmypdf >= 17.
 
 ## Claude Code Development Workflow
 
-### Quality Feedback Loops
+### Quality Gates (All Active)
 
-For maximum autonomy during implementation:
-
-1. **Pre-commit hooks** (already configured) — ruff check + format before every commit
-2. **Claude Code PreToolUse hooks** (already configured) — lint + format + tests before `git commit`
-3. **CI on push** (already configured) — GitHub Actions lint + test + docker build
-
-### Parallel Agent Development
-
-For Phase 2+ where multiple subsystems can be built in parallel, Claude Code agents can work simultaneously in worktrees with coordination via task lists. This is optional — serial task execution works fine for most tasks.
+1. **Pre-commit hook** (`.githooks/pre-commit`) — ruff check + format before every commit
+2. **Claude Code PreToolUse hooks** (`.claude/settings.json`) — lint + format + full test suite before `git commit`; lint + format + rebase before `git push`
+3. **Permission deny rules** — force push, hard reset, checkout-dot, clean -f blocked
+4. **GitHub CI** — lint + test with coverage (>= 85% gate) + Docker build
+5. **Worktree enforcement** — hooks enforce isolated worktrees for parallel agents
 
 ## Decisions NOT Changed
 

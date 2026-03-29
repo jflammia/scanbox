@@ -1,108 +1,98 @@
 # Implementation Context
 
-This file captures decisions, constraints, and context from the design session that a fresh implementation agent needs to know. These are things that aren't obvious from reading the code or design spec alone.
+Decisions, constraints, and gotchas that aren't obvious from reading the code or specs. This file supplements `CLAUDE.md` with deeper technical context.
 
 ## Project Origin
 
-ScanBox was designed in a brainstorming session on 2026-03-28 between the project owner (Justin) and Claude. The design went through multiple rounds of feedback. Key decisions that were debated and settled:
+Designed on 2026-03-28 by the project owner (Justin) and Claude. All three implementation phases are complete. The design went through multiple rounds of feedback — key decisions below were debated and settled.
 
-### Scanner Hardware
+## Hardware Constraints
 
-- **HP Color LaserJet MFP M283cdw** — the specific scanner this was designed for
-- The ADF is **simplex only** for scanning (duplex is print-only). This was confirmed via HP support docs and community forums. The two-pass workflow is not a design choice — it's a hardware limitation.
-- The scanner supports **eSCL (Apple AirScan)** protocol — HTTP REST with XML payloads. This was verified via community reports and protocol documentation. No HP drivers needed.
-- ADF max resolution is **300 DPI** (flatbed goes to 1200). 300 DPI is sufficient for OCR.
-- eSCL has **no authentication**. Anyone on the LAN can start a scan. This is an HP limitation.
-- WebScan may need to be enabled in the printer's EWS (Embedded Web Server) settings. The setup wizard should mention this.
+- **HP Color LaserJet MFP M283cdw** — the target scanner
+- ADF is **simplex only** for scanning (duplex is print-only). The two-pass workflow is a hardware limitation, not a design choice.
+- eSCL (Apple AirScan) protocol — HTTP REST with XML. No drivers needed.
+- ADF max resolution: **300 DPI** (sufficient for OCR)
+- eSCL has **no authentication** — anyone on the LAN can start a scan
+- WebScan may need enabling in the printer's EWS settings
 
-### AI Splitting
+## Architecture Decisions
 
-- The AI prompt asks for JSON with specific fields. Different LLM providers may handle the `response_format={"type": "json_object"}` parameter differently. Test with your chosen provider.
-- Claude Haiku and GPT-4o-mini are both good choices for speed/cost (~$0.02/batch of 50 pages).
-- Ollama with Llama 3.1 or Mistral works for local/offline use but may be slower and less accurate.
-- The **validation layer** is more important than the LLM call itself. If the LLM returns garbage, validation catches it. Build validation before worrying about prompt engineering.
-- The LLM is called once per batch (all pages), not per document. This is a deliberate design choice for efficiency.
+| Decision | Rationale |
+|----------|-----------|
+| **API-first** | REST API is primary. Web UI and MCP consume it. Enables AI agents, scripts, and external tools. |
+| **MCP server** | Native tool calls for Claude and other MCP clients. 17 tools covering full workflow. |
+| **Webhooks** | `scan.completed`, `processing.completed`, `save.completed` events for automation. |
+| **Optional API auth** | `SCANBOX_API_KEY` bearer token. Off by default for local use. |
+| **Two storage volumes** | Internal (Docker volume) persists even if output drive disconnects. Output (user-mounted) is the shareable result. |
+| **PaperlessNGX via REST API** | Not filesystem consumption. Cleaner — no shared mount, direct metadata setting, upload confirmation. |
+| **SQLite** | Single-user app. No concurrency concerns. aiosqlite is sufficient. |
+| **Server-rendered** | htmx + Jinja2 is simpler than a SPA. No JS build step. |
+| **Self-hosted assets** | htmx and Alpine.js vendored locally. No CDN dependencies. |
 
-### Storage Design
+## UX Decisions
 
-- **Two separate volumes** was a deliberate choice. Internal storage (Docker volume) is the safety net — it persists even if the output drive is disconnected. Output storage (user-mounted) is the shareable result.
-- PaperlessNGX is accessed via **REST API** (`POST /api/documents/post_document/`), not by dropping files in a consumption folder. This was a late design pivot — earlier versions used filesystem consumption. The API approach is cleaner (no shared filesystem mount needed, upload confirmation, direct metadata setting).
-- The `created` field in the PaperlessNGX upload is critical — without it, all documents show as "today" instead of their actual date of service.
-
-### Architecture Decisions
-
-- **API-first.** The REST API is the primary interface. The web UI is built on top of it, not alongside it. This was a deliberate pivot to make ScanBox usable by AI agents, scripts, and external tools — not just humans in a browser.
-- **MCP server.** ScanBox exposes an MCP (Model Context Protocol) server so AI agents like Claude can interact natively — scanning, reviewing, correcting, and saving through tool calls. Enable with `MCP_ENABLED=true`.
-- **Webhooks for events.** External systems can register for `scan.completed`, `processing.completed`, and `save.completed` events. This enables integration with any workflow automation.
-- **Optional API auth.** `SCANBOX_API_KEY` adds bearer token auth. Off by default for local use. This keeps the local experience frictionless while allowing secured remote access.
-- **OpenAPI auto-generated.** FastAPI generates the OpenAPI spec at `/api/openapi.json` and interactive docs at `/api/docs`. No manual spec maintenance needed.
-
-### UX Decisions
-
-- **No modes, no toggles.** Automation always runs. The user corrects after. This was a deliberate simplification — earlier versions had a "Manual-First Mode" toggle that was cut.
-- **One "Save" button.** Writes to all destinations (archive, medical records, PaperlessNGX) at once. Earlier versions had separate export buttons — cut for simplicity.
-- **Card layout, not data table** for results. Cards with PDF thumbnails are more approachable for non-technical users.
-- **Wizard pattern** for scanning — numbered steps with illustrations. Not a dashboard.
-- **Error messages must be plain English.** Never say "eSCL protocol error." Say "Can't reach the scanner. Is it turned on?"
-- **In-app practice run** (not a separate test checklist) — the user learns the software by doing a real scan of 1-15 pages, with the app validating everything behind the scenes.
-
-### Things That Were Explicitly Scoped Out (V1)
-
-- Barcode separator sheets
-- Multi-scanner support
-- Mobile-responsive UI
-- ntfy push notifications
-- Direct EHR/Epic upload
-- Document deduplication
-- Heuristic-only splitting (without LLM)
-- Per-field `*_source` tracking (simplified to boolean `user_edited`)
-- Custom output routing per document (fixed paths)
-- Manual page reorder for interleaving (re-scan backs instead)
-- Reopening past sessions for new scans (view + correct only)
+- **No modes or toggles.** Automation always runs. User corrects after.
+- **One Save button.** Writes to all destinations at once.
+- **Card layout** for results (not data table). Cards with thumbnails are more approachable.
+- **Wizard pattern** for scanning — numbered steps with illustrations.
+- **Plain English errors.** Never "eSCL protocol error." Say "Can't reach the scanner."
+- **Practice run** — user learns by doing a real 1-15 page scan with behind-the-scenes validation.
 
 ## Technical Gotchas
 
 ### eSCL Protocol
-
-- eSCL endpoints are at `http://{ip}/eSCL/...` — note the capital S, C, L
-- ScannerCapabilities XML has namespaces: `scan:` and `pwg:`
-- When starting a scan job, the printer returns HTTP 201 with a `Location` header containing the job URL
-- NextDocument returns the scanned page content. Loop until 404 (ADF empty).
-- The ADF doesn't report how many pages are loaded — you only know when it's empty (404)
-- Pages arrive one at a time. Each must be written to disk immediately for crash safety.
+- Endpoints at `http://{ip}/eSCL/...` — capital S, C, L
+- ScannerCapabilities XML uses `scan:` and `pwg:` namespaces
+- POST to ScanJobs → 201 with `Location` header containing job URL
+- Loop GET on NextDocument until 404 (ADF empty)
+- ADF doesn't report page count — you only know when it's empty
+- Pages arrive one at a time — write to disk immediately for crash safety
 
 ### pikepdf
-
-- pikepdf uses 0-indexed pages internally, but the design spec uses 1-indexed page numbers (matching physical page numbering). Convert at the boundary.
-- `pdf.docinfo` uses PDF-style date format: `D:YYYYMMDDHHMMSS`
-- XMP metadata (via `pdf.open_metadata()`) uses Dublin Core namespace
+- 0-indexed pages internally; design spec uses 1-indexed. Convert at boundaries.
+- `pdf.docinfo` uses PDF date format: `D:YYYYMMDDHHMMSS`
+- XMP metadata via `pdf.open_metadata()` uses Dublin Core namespace
+- **Must use `allow_overwriting_input=True`** when opening and saving to same file path (real bug found during testing)
+- **Use `io.BytesIO`**, not `pikepdf.BytesIO` (doesn't exist — real bug found during testing)
 
 ### ocrmypdf
-
-- `--skip-text` flag is important — don't re-OCR pages that already have a text layer
-- `--deskew` corrects slightly rotated pages from the ADF
-- ocrmypdf is a command-line tool, called via `subprocess.run`
-- It requires `tesseract-ocr`, `ghostscript` (since v17), and `poppler-utils` as system packages
+- `--skip-text` — don't re-OCR pages that already have text layers
+- `--deskew` — corrects ADF rotation
+- Command-line tool called via `subprocess.run`
+- Requires `tesseract-ocr`, `ghostscript` (since v17), `poppler-utils` as system packages
 
 ### litellm
-
-- Model IDs differ by provider: `claude-haiku-4-5-20251001` (Anthropic), `gpt-4o-mini` (OpenAI), `ollama/llama3.1` (Ollama)
-- `response_format={"type": "json_object"}` may not work with all Ollama models — add error handling
-- Use `litellm.acompletion()` for async calls in the FastAPI context
+- `==1.82.6` exact pin — 1.82.7/1.82.8 were compromised (supply chain attack, March 24 2026)
+- Model IDs differ by provider: `claude-haiku-4-5-20251001`, `gpt-4o-mini`, `ollama/llama3.1`
+- `response_format={"type": "json_object"}` may not work with all Ollama models
+- Use `litellm.acompletion()` for async in FastAPI context
+- Module-level `config` import in `splitter.py` — must patch config object, not env vars
 
 ### Pillow/pdf2image
+- `convert_from_path` requires `poppler-utils` (`pdftoppm`)
+- 150 DPI sufficient for blank detection (saves memory vs 300)
+- Blank threshold: 0.01 (1% ink coverage) handles scanner artifacts
 
-- `convert_from_path` requires `poppler-utils` (the `pdftoppm` command)
-- For blank detection, 150 DPI is sufficient (saves memory vs 300 DPI)
-- Blank threshold of 0.01 (1% ink coverage) works well for scanner artifacts
+### JSON Keys
+- `text_by_page.json` uses string keys (`"1"`, `"2"`) since JSON doesn't support integer keys
+
+### Lazy Imports
+- Setup endpoints import ESCLClient, litellm, PaperlessClient inside function bodies
+- Mock patches must target the **source module**, not the endpoint module
 
 ## System Dependencies
 
-These must be installed in the Docker image AND on the development machine:
-
-| Package | apt Name | brew Name | Purpose |
-|---------|----------|-----------|---------|
+| Package | apt | brew | Purpose |
+|---------|-----|------|---------|
 | Tesseract | `tesseract-ocr tesseract-ocr-eng` | `tesseract` | OCR engine |
-| Ghostscript | `ghostscript` | `ghostscript` | Required by ocrmypdf >= 17 |
-| Poppler | `poppler-utils` | `poppler` | PDF-to-image rendering |
-| libgl1 | `libgl1` | (included in macOS) | Pillow image processing |
+| Ghostscript | `ghostscript` | `ghostscript` | ocrmypdf >= 17 |
+| Poppler | `poppler-utils` | `poppler` | PDF-to-image |
+| libgl1 | `libgl1` | (macOS built-in) | Pillow |
+
+## V1 Scope Boundaries
+
+Explicitly out of scope:
+- Barcode separators, multi-scanner, mobile UI, ntfy, EHR/Epic upload
+- Document deduplication, heuristic splitting, custom routing
+- Manual page reorder, reopening past sessions for new scans
+- Per-field `*_source` tracking (simplified to boolean `user_edited`)
