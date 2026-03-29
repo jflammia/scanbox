@@ -6,6 +6,7 @@ to perform the full scan-to-documents workflow.
 
 import logging
 from datetime import UTC, datetime
+from io import BytesIO
 from pathlib import Path
 
 import pikepdf
@@ -37,7 +38,7 @@ async def _acquire_pages(scanner: ESCLClient, output_pdf: Path) -> int:
     # Merge individual page PDFs into one combined PDF
     combined = pikepdf.Pdf.new()
     for page_bytes in pages:
-        page_pdf = pikepdf.Pdf.open(pikepdf.BytesIO(page_bytes))
+        page_pdf = pikepdf.Pdf.open(BytesIO(page_bytes))
         combined.pages.extend(page_pdf.pages)
 
     output_pdf.parent.mkdir(parents=True, exist_ok=True)
