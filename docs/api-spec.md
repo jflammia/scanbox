@@ -173,10 +173,6 @@ curl "http://localhost:8090/api/sessions?person_id=john-doe"
     {
       "id": "sess-abc123",
       "person_id": "john-doe",
-      "person_name": "John Doe",
-      "batch_count": 3,
-      "document_count": 12,
-      "state": "saved",
       "created": "2026-03-28T10:00:00-04:00"
     }
   ]
@@ -195,11 +191,21 @@ Create a new scanning session.
 }
 ```
 
-**Response:** `201 Created` with session object including its first batch ID.
+**Response:** `201 Created` with session object.
+
+```json
+{
+  "id": "sess-abc123",
+  "person_id": "john-doe",
+  "created": "2026-03-28T10:00:00Z"
+}
+```
+
+Create a batch separately with `POST /api/sessions/{session_id}/batches`.
 
 #### `GET /api/sessions/{session_id}`
 
-Get session details with all batches.
+Get session details.
 
 ---
 
