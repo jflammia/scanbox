@@ -89,18 +89,18 @@ async def discover_scanners():
     import httpx
 
     found: list[dict] = []
-    sem = asyncio.Semaphore(100)
+    sem = asyncio.Semaphore(20)
 
     async def probe(ip: str, client: httpx.AsyncClient):
         async with sem:
             try:
-                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=1.5)
+                resp = await client.get(f"http://{ip}/eSCL/ScannerStatus", timeout=3.0)
                 if resp.status_code == 200:
                     # Try to get the model name from ScannerCapabilities
                     name = ip
                     try:
                         caps = await client.get(
-                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=1.5
+                            f"http://{ip}/eSCL/ScannerCapabilities", timeout=3.0
                         )
                         if caps.status_code == 200:
                             root = ET.fromstring(caps.text)
@@ -114,7 +114,7 @@ async def discover_scanners():
             except Exception:
                 pass
 
-    # Probe common home network subnets
+    # Probe common home network subnets (20 concurrent, 3s timeout)
     subnets = ["192.168.1", "192.168.0", "192.168.10", "192.168.2", "10.0.0", "10.0.1"]
     ips = [f"{subnet}.{host}" for subnet in subnets for host in range(1, 255)]
 
