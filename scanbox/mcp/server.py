@@ -433,6 +433,36 @@ async def get_sessions() -> str:
         return str(resp.json())
 
 
+@mcp.resource("scanbox://batches/{batch_id}")
+async def get_batch_resource(batch_id: str) -> str:
+    """Batch details including state, page counts, and document list."""
+    async with httpx.AsyncClient() as client:
+        batch_resp = await client.get(f"{_base_url()}/api/batches/{batch_id}")
+        batch = batch_resp.json()
+        docs_resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/documents")
+        docs = docs_resp.json()
+    return str({**batch, "documents": docs})
+
+
+@mcp.resource("scanbox://documents/{document_id}")
+async def get_document_resource(document_id: str) -> str:
+    """Document metadata including type, date, facility, and confidence."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/documents/{document_id}")
+        return str(resp.json())
+
+
+@mcp.resource("scanbox://documents/{document_id}/text")
+async def get_document_text(document_id: str) -> str:
+    """OCR-extracted text for a document."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/documents/{document_id}/text")
+        data = resp.json()
+    pages = data.get("pages", [])
+    parts = [f"--- Page {p['page']} ---\n{p['text']}" for p in pages]
+    return "\n\n".join(parts)
+
+
 # --- Prompts ---
 
 
