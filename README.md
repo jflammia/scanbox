@@ -22,7 +22,7 @@ Built for scanning hundreds of medical records, tax documents, or any mixed stac
 | Interface | For | How |
 |-----------|-----|-----|
 | **REST API** | Scripts, automation, external tools | Full CRUD at `/api/*`. OpenAPI docs at `/api/docs` |
-| **MCP Server** | AI agents (Claude, etc.) | 17 native tools: `scanbox_scan_fronts`, `scanbox_list_documents`, etc. |
+| **MCP Server** | AI agents (Claude, etc.) | 20 native tools: `scanbox_scan_fronts`, `scanbox_diagnose_system`, etc. |
 | **Web UI** | Humans | Wizard-guided scanning at `http://localhost:8090` |
 
 All three share the same backend. Anything you can do in the browser, you can do from curl or Claude.
@@ -105,7 +105,7 @@ Add ScanBox to your AI agent config:
 }
 ```
 
-17 tools, 2 resources, 2 prompts. See [`docs/mcp-server.md`](docs/mcp-server.md).
+20 tools (including onboarding and diagnostics), 2 resources, 4 prompts. See [`docs/mcp-server.md`](docs/mcp-server.md).
 
 ## Output Structure
 
