@@ -1,0 +1,23 @@
+{% macro progress_bar(label, detail="", percent=None) %}
+<div class="space-y-2" role="region" aria-label="{{ label }}">
+  <div class="flex items-center justify-between">
+    <span class="text-lg font-medium text-text-primary">{{ label }}</span>
+    <span class="text-sm text-text-secondary">{{ detail }}</span>
+  </div>
+  {% if percent is not none %}
+  <div class="h-3 bg-gray-200 rounded-full overflow-hidden"
+       role="progressbar" aria-valuenow="{{ percent }}"
+       aria-valuemin="0" aria-valuemax="100"
+       aria-label="{{ label }}: {{ percent }}%">
+    <div class="h-full bg-brand-600 rounded-full transition-all duration-300
+                ease-out"
+         style="width: {{ percent }}%"></div>
+  </div>
+  {% else %}
+  {# Indeterminate - animated pulse #}
+  <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+    <div class="h-full w-1/3 bg-brand-600 rounded-full animate-pulse"></div>
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}

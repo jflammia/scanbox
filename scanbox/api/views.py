@@ -70,6 +70,34 @@ async def results(request: Request, batch_id: str):
     )
 
 
+@router.get("/batches/{batch_id}/boundaries/edit")
+async def boundary_editor(request: Request, batch_id: str):
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Batch not found")
+    documents = await db.list_documents(batch_id)
+    total_pages = max((d["end_page"] for d in documents), default=0)
+
+    # Extract boundary pages (pages after which a new document starts)
+    boundary_pages = []
+    for doc in documents:
+        if doc["end_page"] < total_pages:
+            boundary_pages.append(doc["end_page"])
+
+    return templates.TemplateResponse(
+        request,
+        "boundary_editor.html",
+        {
+            "batch_id": batch_id,
+            "total_pages": total_pages,
+            "boundary_pages": sorted(boundary_pages),
+        },
+    )
+
+
 @router.post("/scan/start")
 async def scan_start(
     person_id: str = Form(...),

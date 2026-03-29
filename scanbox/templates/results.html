@@ -67,6 +67,14 @@
     <p class="text-sm text-text-muted">
       Need to fix something? Tap "Edit" or "Fix This" on any document above.
     </p>
+    {% if batch %}
+    <p class="text-sm mt-2">
+      <a href="/batches/{{ batch.id }}/boundaries/edit"
+         class="text-brand-600 hover:text-brand-700 no-underline">
+        Adjust document boundaries &rarr;
+      </a>
+    </p>
+    {% endif %}
   </div>
   {% endblock %}
 </section>

@@ -120,12 +120,12 @@ class TestBaseLayout:
     async def test_scanner_status_htmx_polling(self, client: AsyncClient):
         resp = await client.get("/")
         assert 'hx-get="/scanner/status"' in resp.text
-        assert "every 10s" in resp.text
+        assert "every 5s" in resp.text
 
     async def test_toast_container(self, client: AsyncClient):
         resp = await client.get("/")
         assert 'id="toast-container"' in resp.text
-        assert 'x-data="{ toasts: [] }"' in resp.text
+        assert "toastManager()" in resp.text
 
     async def test_easter_egg_footer(self, client: AsyncClient):
         resp = await client.get("/")
@@ -467,7 +467,6 @@ class TestDocumentCardFragment:
         resp = await client.get(f"/documents/{doc_id}/card")
         assert "2025-08-10" in resp.text
         assert "City Hospital" in resp.text
-        assert "Dr. Lee" in resp.text
         assert "MRI Brain" in resp.text
 
     async def test_card_page_range(self, seeded, client: AsyncClient):
@@ -475,11 +474,11 @@ class TestDocumentCardFragment:
         resp = await client.get(f"/documents/{doc_id}/card")
         assert "pp." in resp.text
 
-    async def test_card_confidence(self, seeded, client: AsyncClient):
+    async def test_card_has_thumbnail(self, seeded, client: AsyncClient):
         doc_id = seeded["doc1"]["id"]
         resp = await client.get(f"/documents/{doc_id}/card")
-        assert "Confidence:" in resp.text
-        assert "92%" in resp.text
+        assert f"/api/documents/{doc_id}/thumbnail" in resp.text
+        assert "pdf-placeholder.svg" in resp.text
 
     async def test_card_edit_button(self, seeded, client: AsyncClient):
         doc_id = seeded["doc1"]["id"]

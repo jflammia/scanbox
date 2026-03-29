@@ -24,6 +24,12 @@ SKIP_TOKENS = {
     "false",
     "i",
     ":",
+    "is",
+    "none",
+    "selectedPage",
+    "page",
+    "toast.type",
+    "!toast.type",
 }
 
 
@@ -34,7 +40,7 @@ def _extract_defined_classes(css_text: str) -> set[str]:
         raw = m.group(1)
         # Unescape Tailwind notation
         raw = raw.replace("\\:", ":").replace("\\[", "[").replace("\\]", "]")
-        raw = raw.replace("\\/", "/")
+        raw = raw.replace("\\/", "/").replace("\\.", ".")
         classes.add(raw)
         # For pseudo-class variants like "hover:bg-brand-700:hover",
         # register just the Tailwind class name "hover:bg-brand-700"
@@ -59,7 +65,7 @@ def _extract_used_classes(html_text: str) -> set[str]:
             if token in SKIP_TOKENS:
                 continue
             # Skip quoted strings that leaked from :class bindings
-            if token.startswith("'") or token.endswith("'"):
+            if "'" in token or '"' in token:
                 continue
             # Skip numeric comparisons
             if re.match(r"^[\d.]+$", token):

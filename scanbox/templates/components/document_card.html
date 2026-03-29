@@ -1,10 +1,12 @@
-<div id="doc-{{ doc.id }}"
-     class="border-2 rounded-xl bg-surface-raised overflow-hidden transition-all duration-150
-            {% if doc.confidence is not none and doc.confidence < 0.7 %}
-              border-status-warning shadow-amber-100
-            {% else %}
-              border-border hover:border-brand-500 hover:shadow-lg
-            {% endif %}">
+{% macro document_card(doc, editable=true) %}
+<article class="group relative rounded-xl border-2 bg-surface-raised overflow-hidden
+                transition-all duration-150
+                {% if doc.confidence is not none and doc.confidence < 0.7 %}
+                  border-status-warning shadow-amber-100
+                {% else %}
+                  border-border hover:border-brand-500 hover:shadow-lg
+                {% endif %}"
+         id="doc-{{ doc.id }}">
 
   {# Thumbnail #}
   <div class="aspect-[3/4] bg-gray-100 relative overflow-hidden">
@@ -26,11 +28,9 @@
 
   {# Card body #}
   <div class="p-4">
-    <div class="flex items-center justify-between">
-      <span class="font-semibold text-lg">{{ doc.document_type or 'Unknown' }}</span>
-      <span class="text-xs text-text-muted">pp. {{ doc.start_page }}&ndash;{{ doc.end_page }}</span>
-    </div>
-
+    <h3 class="font-semibold text-text-primary truncate text-lg">
+      {{ doc.document_type or 'Unknown' }}
+    </h3>
     <p class="text-text-secondary mt-1">
       {% if doc.date_of_service and doc.date_of_service != 'unknown' %}
         {{ doc.date_of_service }}
@@ -38,15 +38,13 @@
         <span class="text-status-warning">Date unknown</span>
       {% endif %}
     </p>
-
     {% if doc.facility and doc.facility != 'unknown' %}
-    <p class="text-sm text-text-secondary mt-0.5 truncate">{{ doc.facility }}</p>
+    <p class="text-text-secondary text-sm mt-0.5 truncate">{{ doc.facility }}</p>
     {% endif %}
-
     {% if doc.description and doc.description != 'Document' %}
-    <p class="text-sm text-text-muted mt-1 truncate">{{ doc.description }}</p>
+    <p class="text-text-muted text-sm mt-1 truncate">{{ doc.description }}</p>
     {% endif %}
-
+    <p class="text-xs text-text-muted mt-1">pp. {{ doc.start_page }}&ndash;{{ doc.end_page }}</p>
     {% if doc.user_edited %}
     <p class="text-xs text-brand-600 mt-2 flex items-center gap-1">
       {% include "icons/pencil.svg" %} Edited by you
@@ -55,17 +53,20 @@
   </div>
 
   {# Actions #}
+  {% if editable %}
   <div class="px-4 pb-4 flex gap-2">
     <button hx-get="/documents/{{ doc.id }}/edit"
-            hx-target="#doc-{{ doc.id }}"
-            hx-swap="outerHTML"
-            class="flex-1 py-2.5 text-sm font-medium rounded-lg min-h-11 transition-colors
+            hx-target="#doc-{{ doc.id }}" hx-swap="outerHTML"
+            class="flex-1 py-2.5 text-sm font-medium rounded-lg
                    {% if doc.confidence is not none and doc.confidence < 0.7 %}
                      bg-status-warning text-white hover:bg-amber-600
                    {% else %}
                      bg-brand-600 text-white hover:bg-brand-700
-                   {% endif %}">
+                   {% endif %}
+                   min-h-11 transition-colors">
       {% if doc.confidence is not none and doc.confidence < 0.7 %}Fix This{% else %}Edit{% endif %}
     </button>
   </div>
-</div>
+  {% endif %}
+</article>
+{% endmacro %}
