@@ -22,7 +22,7 @@ from scanbox.scanner.escl import ESCLClient
 logger = logging.getLogger(__name__)
 
 
-async def _acquire_pages(scanner: ESCLClient, output_pdf: Path) -> int:
+async def _acquire_pages(scanner: ESCLClient, output_pdf: Path, on_page: callable = None) -> int:
     """Scan all pages from the ADF into a single PDF. Returns page count."""
     job_url = await scanner.start_scan()
 
@@ -32,6 +32,8 @@ async def _acquire_pages(scanner: ESCLClient, output_pdf: Path) -> int:
         if page_data is None:
             break
         pages.append(page_data)
+        if on_page:
+            await on_page(len(pages))
 
     if not pages:
         return 0
@@ -60,7 +62,10 @@ async def scan_fronts_task(batch_id: str, db: Database) -> None:
 
         await event_bus.publish(batch_id, {"type": "progress", "stage": "scanning_fronts"})
 
-        page_count = await _acquire_pages(scanner, fronts_pdf)
+        async def on_page_fronts(n):
+            await event_bus.publish(batch_id, {"type": "page_scanned", "side": "fronts", "page": n})
+
+        page_count = await _acquire_pages(scanner, fronts_pdf, on_page=on_page_fronts)
 
         await db.update_batch_state(batch_id, "fronts_done", fronts_page_count=page_count)
         await event_bus.publish(
@@ -92,7 +97,10 @@ async def scan_backs_task(batch_id: str, db: Database) -> None:
 
         await event_bus.publish(batch_id, {"type": "progress", "stage": "scanning_backs"})
 
-        page_count = await _acquire_pages(scanner, backs_pdf)
+        async def on_page_backs(n):
+            await event_bus.publish(batch_id, {"type": "page_scanned", "side": "backs", "page": n})
+
+        page_count = await _acquire_pages(scanner, backs_pdf, on_page=on_page_backs)
 
         await db.update_batch_state(batch_id, "backs_done", backs_page_count=page_count)
         await event_bus.publish(
@@ -147,15 +155,17 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
         has_backs=has_backs,
     )
 
-    async def on_progress(stage_name: str, detail: str = ""):
+    async def on_progress(stage_name: str, detail: str = "", complete: bool = False):
+        event_type = "stage_complete" if complete else "progress"
         await event_bus.publish(
             batch_id,
-            {"type": "progress", "stage": stage_name, "detail": detail},
+            {"type": event_type, "stage": stage_name, "detail": detail},
         )
-        await dispatch_webhook_event(
-            "processing.stage_completed",
-            {"batch_id": batch_id, "stage": stage_name, "detail": detail},
-        )
+        if not complete:
+            await dispatch_webhook_event(
+                "processing.stage_completed",
+                {"batch_id": batch_id, "stage": stage_name, "detail": detail},
+            )
 
     documents: list[SplitDocument] = await run_pipeline(ctx, on_progress=on_progress)
 

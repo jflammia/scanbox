@@ -56,7 +56,7 @@ async def run_pipeline(
 
     Args:
         ctx: Pipeline context with paths and metadata.
-        on_progress: Optional async callback(stage_name, detail) for SSE updates.
+        on_progress: Optional async callback(stage_name, detail, complete) for SSE updates.
     """
     state = _read_state(ctx)
     current_stage = ProcessingStage(state["stage"])
@@ -66,6 +66,10 @@ async def run_pipeline(
         if on_progress:
             await on_progress(stage.value, detail)
 
+    async def stage_done(stage: ProcessingStage, detail: str = ""):
+        if on_progress:
+            await on_progress(stage.value, detail, complete=True)
+
     # Stage 1: Interleave
     combined_path = ctx.batch_dir / "combined.pdf"
     if current_stage == ProcessingStage.INTERLEAVING:
@@ -73,6 +77,9 @@ async def run_pipeline(
         fronts_path = ctx.batch_dir / "fronts.pdf"
         backs_path = ctx.batch_dir / "backs.pdf" if ctx.has_backs else None
         interleave_pages(fronts_path, backs_path, combined_path)
+        combined_pdf = pikepdf.Pdf.open(combined_path)
+        total_pages = len(combined_pdf.pages)
+        await stage_done(ProcessingStage.INTERLEAVING, f"Combined into {total_pages} pages")
         current_stage = ProcessingStage.BLANK_REMOVAL
 
     # Stage 2: Blank removal
@@ -85,6 +92,11 @@ async def run_pipeline(
             "total_pages": result.total_pages,
         }
         (ctx.batch_dir / "blank_removal.json").write_text(json.dumps(removed_info))
+        kept = result.total_pages - len(result.removed_indices)
+        await stage_done(
+            ProcessingStage.BLANK_REMOVAL,
+            f"{kept} pages, {len(result.removed_indices)} blank removed",
+        )
         current_stage = ProcessingStage.OCR
 
     # Stage 3: OCR
@@ -93,6 +105,7 @@ async def run_pipeline(
     if current_stage == ProcessingStage.OCR:
         await progress(ProcessingStage.OCR, "Reading text from your documents...")
         run_ocr(cleaned_path, ocr_path, text_json_path)
+        await stage_done(ProcessingStage.OCR, "OCR complete")
         current_stage = ProcessingStage.SPLITTING
 
     # Stage 4: AI Splitting
@@ -106,6 +119,7 @@ async def run_pipeline(
         documents = await split_documents(page_texts, ctx.person_name)
         splits_data = [doc.model_dump() for doc in documents]
         splits_path.write_text(json.dumps(splits_data, indent=2))
+        await stage_done(ProcessingStage.SPLITTING, f"Found {len(documents)} documents")
         current_stage = ProcessingStage.NAMING
 
     # Stage 5: Split, embed metadata, name
@@ -166,6 +180,7 @@ async def run_pipeline(
         splits_data = [doc.model_dump() for doc in documents]
         splits_path.write_text(json.dumps(splits_data, indent=2))
         _write_state(ctx, ProcessingStage.DONE)
+        await stage_done(ProcessingStage.NAMING, "All documents named")
 
     # Read back final documents list
     splits_data = json.loads(splits_path.read_text())

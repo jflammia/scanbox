@@ -34,7 +34,8 @@
       <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
               hx-post="/batches/{{ batch.id }}/scan-fronts"
               hx-target="#step1-progress"
-              hx-swap="innerHTML">
+              hx-swap="innerHTML"
+              hx-disabled-elt="this">
         Scan Front Sides
       </button>
     </div>
@@ -65,7 +66,8 @@
         <button class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150"
                 hx-post="/batches/{{ batch.id }}/scan-backs"
                 hx-target="#step2-progress"
-                hx-swap="innerHTML">
+                hx-swap="innerHTML"
+                hx-disabled-elt="this">
           Scan Back Sides
         </button>
         <a href="#" class="text-brand-600 hover:text-brand-700 text-base no-underline"
@@ -86,10 +88,7 @@
       <h2 class="text-xl font-semibold">Processing</h2>
     </div>
     <div id="step3-progress" aria-live="polite">
-      <p class="text-lg text-text-secondary">Processing your documents...</p>
-      <div class="h-3 bg-gray-200 rounded-full overflow-hidden mt-3">
-        <div class="h-full bg-brand-600 rounded-full animate-pulse" style="width: 33%"></div>
-      </div>
+      <p class="text-lg text-text-secondary">Your documents are being processed. Progress appears above.</p>
     </div>
   </section>
 </div>
