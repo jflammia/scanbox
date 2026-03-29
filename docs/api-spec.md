@@ -35,34 +35,23 @@ curl -H "Authorization: Bearer your-secret-key" http://localhost:8090/api/health
 
 ## Common Patterns
 
-### Pagination
+### List Responses
 
-List endpoints support cursor-based pagination:
-
-```
-GET /api/sessions?limit=20&offset=0
-```
-
-Response includes pagination metadata:
+List endpoints return all items in a consistent wrapper:
 
 ```json
 {
-  "items": [...],
-  "total": 45,
-  "limit": 20,
-  "offset": 0
+  "items": [...]
 }
 ```
 
 ### Error Responses
 
-All errors return a consistent JSON structure:
+Errors use FastAPI's standard format:
 
 ```json
 {
-  "error": "not_found",
-  "message": "Batch abc123 not found",
-  "detail": null
+  "detail": "Batch abc123 not found"
 }
 ```
 
@@ -90,26 +79,25 @@ System health check and version info.
 ```json
 {
   "status": "ok",
-  "version": "0.0.1",
-  "scanner": {
-    "status": "idle",
-    "ip": "192.168.10.11",
-    "model": "HP Color LaserJet MFP M283cdw",
-    "adf_loaded": true
+  "api": "ok",
+  "database": "ok",
+  "scanner": "ok",
+  "storage": {
+    "internal": "ok",
+    "output": "ok"
   },
   "llm": {
     "provider": "anthropic",
     "model": "claude-haiku-4-5-20251001",
-    "status": "ok"
+    "configured": true
   },
-  "storage": {
-    "internal": {"status": "ok", "path": "/app/data"},
-    "output": {"status": "ok", "path": "/output"}
-  },
-  "mcp_enabled": false,
-  "paperless_configured": true
+  "paperless": {
+    "configured": false
+  }
 }
 ```
+
+The `status` field is `"ok"` when all critical subsystems work, or `"degraded"` if the database is down. The `scanner` field is one of `"ok"`, `"unreachable"`, or `"not configured"`.
 
 ---
 
@@ -219,6 +207,14 @@ Get session details with all batches.
 
 A batch represents one stack of documents fed through the scanner.
 
+#### `POST /api/sessions/{session_id}/batches`
+
+Create a new batch within a session. **Response:** `201 Created` with batch object.
+
+#### `GET /api/sessions/{session_id}/batches`
+
+List all batches in a session. **Response:** `{"items": [...]}`
+
 #### `GET /api/batches/{batch_id}`
 
 Get batch status and details.
@@ -285,49 +281,40 @@ Save all documents to output destinations (archive, medical-records, PaperlessNG
 
 ---
 
-### Scanning Progress (SSE)
+### Batch Progress
 
 #### `GET /api/batches/{batch_id}/progress`
 
-Server-Sent Events stream for real-time scanning and processing progress.
+JSON polling endpoint for current processing status.
+
+**Response:**
+
+```json
+{
+  "batch_id": "batch-001",
+  "state": "processing",
+  "processing_stage": "ocr"
+}
+```
+
+#### `GET /api/batches/{batch_id}/progress/stream`
+
+Server-Sent Events stream for real-time progress updates.
 
 **SSE Events:**
 
 ```
-event: progress
-data: {"stage": "scanning", "pages_scanned": 23, "side": "fronts"}
-
-event: progress
-data: {"stage": "blank_removal", "pages_processed": 4, "total_pages": 47}
-
-event: progress
-data: {"stage": "ocr", "pages_processed": 31, "total_pages": 47}
-
-event: progress
-data: {"stage": "splitting", "status": "calling_llm"}
-
-event: progress
-data: {"stage": "naming", "documents_named": 12}
-
-event: complete
-data: {"stage": "done", "document_count": 12}
+data: {"type": "progress", "stage": "scanning_fronts"}
+data: {"type": "scan_complete", "side": "fronts", "pages": 47}
+data: {"type": "progress", "stage": "ocr"}
+data: {"type": "done", "document_count": 12}
+data: {"type": "error", "message": "Scanner offline"}
 ```
 
 **Usage with curl:**
 
 ```bash
-curl -N http://localhost:8090/api/batches/batch-001/progress
-```
-
-**Usage with Python:**
-
-```python
-import httpx
-
-with httpx.stream("GET", "http://localhost:8090/api/batches/batch-001/progress") as r:
-    for line in r.iter_lines():
-        if line.startswith("data: "):
-            print(line[6:])
+curl -N http://localhost:8090/api/batches/batch-001/progress/stream
 ```
 
 ---
@@ -527,6 +514,38 @@ Register a new webhook.
 #### `DELETE /api/webhooks/{webhook_id}`
 
 Remove a webhook.
+
+#### `GET /api/webhooks/events`
+
+List available webhook event types.
+
+**Response:**
+
+```json
+{
+  "events": ["scan.completed", "processing.completed", "save.completed"]
+}
+```
+
+---
+
+### Practice Run
+
+The practice run wizard guides new users through a test scan.
+
+#### `GET /api/practice/status`
+
+Get the current practice run status and progress.
+
+#### `POST /api/practice/step/{step}/complete`
+
+Mark a practice run step as complete.
+
+#### `POST /api/practice/reset`
+
+Reset the practice run to start over.
+
+---
 
 #### Webhook Payload Format
 
