@@ -117,8 +117,8 @@ class TestRunPipeline:
 
         progress_calls = []
 
-        async def on_progress(stage: str, detail: str = ""):
-            progress_calls.append((stage, detail))
+        async def on_progress(stage: str, detail: str = "", complete: bool = False):
+            progress_calls.append((stage, detail, complete))
 
         docs = await run_pipeline(ctx, on_progress=on_progress)
 
@@ -128,13 +128,21 @@ class TestRunPipeline:
         assert docs[0].filename.endswith(".pdf")
         assert docs[1].filename.endswith(".pdf")
 
-        # Verify progress was called for each stage
-        stages = [c[0] for c in progress_calls]
+        # Verify progress was called for each stage (start events)
+        stages = [c[0] for c in progress_calls if not c[2]]
         assert "interleaving" in stages
         assert "blank_removal" in stages
         assert "ocr" in stages
         assert "splitting" in stages
         assert "naming" in stages
+
+        # Verify stage_done was called for each stage (complete events)
+        done_stages = [c[0] for c in progress_calls if c[2]]
+        assert "interleaving" in done_stages
+        assert "blank_removal" in done_stages
+        assert "ocr" in done_stages
+        assert "splitting" in done_stages
+        assert "naming" in done_stages
 
         # Verify document files were created
         docs_dir = ctx.batch_dir / "documents"
@@ -230,3 +238,55 @@ class TestRunPipeline:
 
         docs = await run_pipeline(ctx, on_progress=None)
         assert len(docs) == 1
+
+    @patch("scanbox.pipeline.runner.split_documents")
+    @patch("scanbox.pipeline.runner.run_ocr")
+    @patch("scanbox.pipeline.runner.remove_blank_pages")
+    @patch("scanbox.pipeline.runner.interleave_pages")
+    async def test_stage_done_detail_messages(
+        self, mock_interleave, mock_blank, mock_ocr, mock_split, tmp_path
+    ):
+        """stage_done calls include correct detail strings."""
+        ctx = _make_ctx(tmp_path)
+        _make_pdf(ctx.batch_dir / "fronts.pdf", 2)
+
+        def fake_interleave(fronts, backs, output):
+            _make_pdf(output, 2)
+
+        mock_interleave.side_effect = fake_interleave
+
+        mock_result = MagicMock()
+        mock_result.removed_indices = [1]
+        mock_result.total_pages = 2
+
+        def fake_blank(inp, out, threshold):
+            _make_pdf(out, 1)
+            return mock_result
+
+        mock_blank.side_effect = fake_blank
+
+        def fake_ocr(inp, out, text_json):
+            _make_pdf(out, 1)
+            text_json.write_text(json.dumps({"1": "Page 1"}))
+
+        mock_ocr.side_effect = fake_ocr
+
+        mock_split.return_value = [
+            SplitDocument(start_page=1, end_page=1, document_type="Lab Results")
+        ]
+
+        done_calls = []
+
+        async def on_progress(stage: str, detail: str = "", complete: bool = False):
+            if complete:
+                done_calls.append((stage, detail))
+
+        await run_pipeline(ctx, on_progress=on_progress)
+
+        done_map = dict(done_calls)
+        assert "2 pages" in done_map["interleaving"]
+        assert "1 pages" in done_map["blank_removal"]
+        assert "1 blank removed" in done_map["blank_removal"]
+        assert done_map["ocr"] == "OCR complete"
+        assert "1 documents" in done_map["splitting"]
+        assert done_map["naming"] == "All documents named"
