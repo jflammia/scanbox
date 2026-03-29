@@ -12,7 +12,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/jflammia/scanbox?include_prereleases&label=release)](https://github.com/jflammia/scanbox/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/jflammia/scanbox?style=flat)](https://github.com/jflammia/scanbox/stargazers)
 
-<a href="https://glama.ai/mcp/servers"><img width="380" height="auto" alt="MCP Server" src="https://glama.ai/mcp/servers/badge" /></a>
+<a href="https://glama.ai/mcp/servers/jflammia/scanbox"><img width="380" height="auto" alt="MCP Server" src="https://glama.ai/mcp/servers/jflammia/scanbox/badges/card.svg" /></a>
 
 [Quick Start](#quick-start) · [Features](#features) · [Screenshots](#screenshots) · [Documentation](#documentation) · [API](#api) · [MCP](#mcp-integration) · [Contributing](#contributing)
 
