@@ -23,7 +23,7 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY scanbox/ scanbox/
 COPY static/ static/
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --disable-pip-version-check --root-user-action=ignore .
 
 # Run as non-root
 RUN useradd --create-home scanbox
