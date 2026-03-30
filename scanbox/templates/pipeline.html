@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}ScanBox — Processing{% endblock %}
+
+{% block breadcrumb %}
+<nav class="max-w-4xl mx-auto px-4 text-sm text-text-muted">
+  <a href="/" class="hover:text-text-primary no-underline">&larr; Home</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<section class="space-y-6"
+         x-data="pipelineView()"
+         x-init="connectSSE()">
+
+  {# Header #}
+  <div>
+    <h1 class="text-3xl font-bold">Processing{{ " for " + person.display_name if person else "" }}</h1>
+    <p class="text-text-secondary mt-1">
+      Batch {{ batch.batch_num }}
+      {% if pipeline_status == "completed" %}
+      &mdash; <span class="text-status-success font-medium">Complete</span>
+      {% elif pipeline_status == "paused" %}
+      &mdash; <span class="text-status-warning font-medium">Paused</span>
+      {% elif pipeline_status == "error" %}
+      &mdash; <span class="text-status-error font-medium">Error</span>
+      {% elif pipeline_status == "running" %}
+      &mdash; <span class="text-brand-600 font-medium">Running</span>
+      {% endif %}
+    </p>
+  </div>
+
+  {# Pipeline stages #}
+  <div class="space-y-3" id="pipeline-stages" aria-live="polite">
+    {% for stage_key, stage_label in stage_labels.items() %}
+    {% set stage = stages.get(stage_key, {}) %}
+    {% set status = stage.get("status", "pending") %}
+    <div class="bg-surface-raised border border-border rounded-lg p-4"
+         x-data="{ expanded: false }"
+         id="stage-{{ stage_key }}">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          {# Status icon #}
+          {% if status == "completed" %}
+          <span class="text-status-success font-bold">&#10003;</span>
+          {% elif status == "running" %}
+          <div class="w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin inline-block"></div>
+          {% elif status == "paused" %}
+          <span class="text-status-warning font-bold">&#9888;</span>
+          {% elif status == "error" %}
+          <span class="text-status-error font-bold">&#10007;</span>
+          {% elif status == "skipped" %}
+          <span class="text-text-muted">&#8212;</span>
+          {% else %}
+          <span class="text-text-muted">&#9675;</span>
+          {% endif %}
+
+          {# Label #}
+          {% if status == "skipped" %}
+          <span class="font-medium text-text-muted"><s>{{ stage_label }}</s></span>
+          {% elif status == "pending" %}
+          <span class="font-medium text-text-muted">{{ stage_label }}</span>
+          {% else %}
+          <span class="font-medium text-text-primary">{{ stage_label }}</span>
+          {% endif %}
+        </div>
+
+        {# Expand button for completed stages with results #}
+        {% if status == "completed" and stage.get("result") %}
+        <button @click="expanded = !expanded"
+                class="text-sm text-brand-600 hover:text-brand-700"
+                :aria-expanded="expanded">
+          <span x-show="!expanded">Details</span>
+          <span x-show="expanded">Hide</span>
+        </button>
+        {% endif %}
+      </div>
+
+      {# Result summary (inline for completed) #}
+      {% if status == "completed" and stage.get("result") %}
+      <p class="text-sm text-text-secondary mt-1 ml-2">
+        {% if stage_key == "interleaving" and stage.result.get("total_pages") %}
+        {{ stage.result.total_pages }} pages combined
+        {% elif stage_key == "blank_removal" and stage.result.get("removed_indices") is not none %}
+        {{ stage.result.kept_pages }} pages kept, {{ stage.result.removed_indices | length }} blank removed
+        {% elif stage_key == "ocr" %}
+        Text recognition complete
+        {% elif stage_key == "splitting" and stage.result.get("document_count") %}
+        {{ stage.result.document_count }} document{{ "s" if stage.result.document_count != 1 else "" }} found
+        {% elif stage_key == "naming" and stage.result.get("documents_named") %}
+        {{ stage.result.documents_named }} document{{ "s" if stage.result.documents_named != 1 else "" }} named
+        {% endif %}
+      </p>
+      {% endif %}
+
+      {# Expanded detail panel #}
+      {% if status == "completed" and stage.get("result") %}
+      <div x-show="expanded" x-transition class="mt-3 ml-2 text-sm text-text-secondary bg-gray-100 rounded p-3">
+        <code class="font-mono text-xs">{{ stage.result | tojson(indent=2) }}</code>
+      </div>
+      {% endif %}
+
+      {# Paused state: reason + control buttons #}
+      {% if status == "paused" %}
+      <div class="mt-3 ml-2 space-y-3">
+        <p class="text-sm text-status-warning">{{ stage.get("pause_reason", "Pipeline paused") }}</p>
+        <div class="flex gap-2">
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
+                  hx-post="/api/batches/{{ batch.id }}/pipeline/resume"
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+            Resume
+          </button>
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
+                  hx-post="/api/batches/{{ batch.id }}/pipeline/skip"
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+            Skip
+          </button>
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
+                  hx-post="/api/batches/{{ batch.id }}/pipeline/advance"
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+            Accept &amp; Continue
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Error state: message + control buttons #}
+      {% if status == "error" %}
+      <div class="mt-3 ml-2 space-y-3">
+        <p class="text-sm text-status-error">{{ stage.get("error", "An unexpected error occurred") }}</p>
+        <div class="flex gap-2">
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
+                  hx-post="/api/batches/{{ batch.id }}/pipeline/retry"
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+            Retry
+          </button>
+          <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors"
+                  hx-post="/api/batches/{{ batch.id }}/pipeline/skip"
+                  hx-swap="none"
+                  hx-on::after-request="window.location.reload()">
+            Skip
+          </button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# Link to results when complete #}
+  {% if pipeline_status == "completed" or batch.state == "review" %}
+  <div class="text-center pt-4">
+    <a href="/results/{{ batch.id }}"
+       class="inline-block bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors no-underline">
+      Review Documents
+    </a>
+  </div>
+  {% endif %}
+
+  {# DLQ Section #}
+  {% if dlq %}
+  <section class="space-y-3">
+    <h2 class="text-xl font-semibold">Items needing attention</h2>
+    <p class="text-sm text-text-secondary">
+      These items had issues during processing. You can retry or discard them.
+    </p>
+
+    <div id="dlq-list" class="space-y-3">
+      {% for item in dlq %}
+      <div class="bg-surface-raised border-2 border-status-warning rounded-lg p-4"
+           id="dlq-{{ item.id }}">
+        <div class="flex items-start justify-between gap-4">
+          <div class="space-y-1">
+            <p class="font-medium text-text-primary">
+              {% if item.document and item.document.document_type %}
+              {{ item.document.document_type }}
+              {% else %}
+              Document
+              {% endif %}
+              <span class="text-sm text-text-muted">&mdash; {{ item.stage }}</span>
+            </p>
+            <p class="text-sm text-status-warning">{{ item.reason }}</p>
+            {% if item.document %}
+            <p class="text-sm text-text-muted">
+              {% if item.document.start_page and item.document.end_page %}
+              Pages {{ item.document.start_page }}&ndash;{{ item.document.end_page }}
+              {% endif %}
+              {% if item.document.facility and item.document.facility != "unknown" %}
+              &middot; {{ item.document.facility }}
+              {% endif %}
+            </p>
+            {% endif %}
+            <p class="text-xs text-text-muted">Added {{ item.added_at[:19] | replace("T", " ") }}</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="text-sm px-3 py-1 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
+                    hx-post="/api/batches/{{ batch.id }}/dlq/{{ item.id }}/retry"
+                    hx-target="#dlq-{{ item.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="window.location.reload()">
+              Retry
+            </button>
+            <button class="text-sm px-3 py-1 rounded-md bg-white text-status-error border border-border hover:bg-gray-100 transition-colors"
+                    hx-delete="/api/batches/{{ batch.id }}/dlq/{{ item.id }}"
+                    hx-target="#dlq-{{ item.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="window.location.reload()">
+              Discard
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</section>
+
+<script>
+function pipelineView() {
+  return {
+    status: '{{ pipeline_status }}',
+    batchId: '{{ batch.id }}',
+    eventSource: null,
+
+    connectSSE() {
+      // Only connect if pipeline is actively running
+      if (this.status !== 'running') return;
+      this.eventSource = new EventSource('/batches/' + this.batchId + '/progress');
+      this.eventSource.onmessage = (e) => {
+        // SSE delivers HTML fragments; append them to the stage area
+        var target = document.getElementById('pipeline-stages');
+        if (target && e.data) {
+          // When pipeline finishes, reload for final state
+          if (e.data.includes('All done') || e.data.includes('text-status-error')) {
+            setTimeout(function() { window.location.reload(); }, 1000);
+          }
+        }
+      };
+      this.eventSource.onerror = function() {
+        // Connection closed means pipeline finished or errored
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+          setTimeout(function() { window.location.reload(); }, 2000);
+        }
+      }.bind(this);
+    }
+  };
+}
+</script>
+{% endblock %}
