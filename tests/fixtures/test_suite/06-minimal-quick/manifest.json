@@ -1,0 +1,75 @@
+{
+  "generated_at": "2026-03-30T16:06:48.050097+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 3,
+  "num_logical_pages": 4,
+  "documents": [
+    {
+      "name": "cbc_lab_report",
+      "description": "CBC with Differential + CMP -- Quest Diagnostics style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "chest_xray",
+      "description": "Chest X-Ray radiology report -- hospital style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "referral_letter",
+      "description": "Physician referral letter -- traditional letter format",
+      "pages": 1,
+      "single_sided": true
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "cbc_lab_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "cbc_lab_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "chest_xray",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 2,
+      "front": {
+        "doc": "referral_letter",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [],
+  "counts": {
+    "content_backs": 1,
+    "blank_backs": 2,
+    "near_blank_backs": 0
+  }
+}

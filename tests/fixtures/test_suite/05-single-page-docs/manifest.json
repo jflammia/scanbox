@@ -1,0 +1,111 @@
+{
+  "generated_at": "2026-03-30T16:06:48.034465+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 5,
+  "num_logical_pages": 5,
+  "documents": [
+    {
+      "name": "chest_xray",
+      "description": "Chest X-Ray radiology report -- hospital style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "pathology_report",
+      "description": "Surgical pathology report -- dense small font",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "medication_list",
+      "description": "Pharmacy medication list -- CVS style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "referral_letter",
+      "description": "Physician referral letter -- traditional letter format",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "immunization_record",
+      "description": "Immunization history -- government style",
+      "pages": 1,
+      "single_sided": true
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "chest_xray",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "pathology_report",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 2,
+      "front": {
+        "doc": "medication_list",
+        "page": 1
+      },
+      "back": {
+        "type": "near_blank_smudge",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 3,
+      "front": {
+        "doc": "referral_letter",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 4,
+      "front": {
+        "doc": "immunization_record",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [],
+  "counts": {
+    "content_backs": 0,
+    "blank_backs": 4,
+    "near_blank_backs": 1
+  }
+}

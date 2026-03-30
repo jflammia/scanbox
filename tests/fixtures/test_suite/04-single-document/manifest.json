@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-03-30T16:06:48.008932+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 2,
+  "num_logical_pages": 3,
+  "documents": [
+    {
+      "name": "operative_report",
+      "description": "Operative/surgical report -- formal surgical style",
+      "pages": 3,
+      "single_sided": false
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "operative_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "operative_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "operative_report",
+        "page": 3
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [],
+  "counts": {
+    "content_backs": 1,
+    "blank_backs": 1,
+    "near_blank_backs": 0
+  }
+}

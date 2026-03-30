@@ -1,0 +1,123 @@
+{
+  "generated_at": "2026-03-30T16:06:47.990823+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 6,
+  "num_logical_pages": 11,
+  "documents": [
+    {
+      "name": "cbc_lab_report",
+      "description": "CBC with Differential + CMP -- Quest Diagnostics style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "discharge_summary",
+      "description": "Hospital discharge summary -- Johns Hopkins style",
+      "pages": 3,
+      "single_sided": false
+    },
+    {
+      "name": "diabetes_care_plan",
+      "description": "Diabetes management care plan -- doctor's office style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "insurance_eob",
+      "description": "Insurance explanation of benefits -- dense columnar",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "pt_progress_note",
+      "description": "Physical therapy progress note -- SOAP format",
+      "pages": 2,
+      "single_sided": false
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "cbc_lab_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "cbc_lab_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "discharge_summary",
+        "page": 2
+      }
+    },
+    {
+      "index": 2,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 3
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 3,
+      "front": {
+        "doc": "diabetes_care_plan",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "diabetes_care_plan",
+        "page": 2
+      }
+    },
+    {
+      "index": 4,
+      "front": {
+        "doc": "insurance_eob",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "insurance_eob",
+        "page": 2
+      }
+    },
+    {
+      "index": 5,
+      "front": {
+        "doc": "pt_progress_note",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "pt_progress_note",
+        "page": 2
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [],
+  "counts": {
+    "content_backs": 5,
+    "blank_backs": 1,
+    "near_blank_backs": 0
+  }
+}
