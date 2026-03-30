@@ -7,7 +7,7 @@ import pikepdf
 import pytest
 
 from scanbox.database import Database
-from scanbox.models import SplitDocument
+from scanbox.models import PipelineResult, SplitDocument
 
 
 def _make_pdf(path: Path, num_pages: int = 1) -> None:
@@ -297,20 +297,23 @@ class TestRunProcessing:
         from scanbox.api.scanning import _run_processing
 
         mock_bus.publish = AsyncMock()
-        mock_pipeline.return_value = [
-            SplitDocument(
-                start_page=1,
-                end_page=2,
-                document_type="Lab Results",
-                filename="2026-01-15_Test-User_Lab-Results.pdf",
-            ),
-            SplitDocument(
-                start_page=3,
-                end_page=3,
-                document_type="Letter",
-                filename="2026-01-20_Test-User_Letter.pdf",
-            ),
-        ]
+        mock_pipeline.return_value = PipelineResult(
+            status="completed",
+            documents=[
+                SplitDocument(
+                    start_page=1,
+                    end_page=2,
+                    document_type="Lab Results",
+                    filename="2026-01-15_Test-User_Lab-Results.pdf",
+                ),
+                SplitDocument(
+                    start_page=3,
+                    end_page=3,
+                    document_type="Letter",
+                    filename="2026-01-20_Test-User_Letter.pdf",
+                ),
+            ],
+        )
 
         db = batch_with_dirs["db"]
         batch_id = batch_with_dirs["batch"]["id"]
@@ -336,9 +339,12 @@ class TestRunProcessing:
         from scanbox.api.scanning import _run_processing
 
         mock_bus.publish = AsyncMock()
-        mock_pipeline.return_value = [
-            SplitDocument(start_page=1, end_page=3, document_type="Other", filename=""),
-        ]
+        mock_pipeline.return_value = PipelineResult(
+            status="completed",
+            documents=[
+                SplitDocument(start_page=1, end_page=3, document_type="Other", filename=""),
+            ],
+        )
 
         db = batch_with_dirs["db"]
         batch_id = batch_with_dirs["batch"]["id"]
@@ -363,9 +369,12 @@ class TestRunProcessing:
         async def capture_on_progress(ctx, on_progress=None):
             nonlocal captured_on_progress
             captured_on_progress = on_progress
-            return [
-                SplitDocument(start_page=1, end_page=1, document_type="Other", filename="x.pdf")
-            ]
+            return PipelineResult(
+                status="completed",
+                documents=[
+                    SplitDocument(start_page=1, end_page=1, document_type="Other", filename="x.pdf")
+                ],
+            )
 
         mock_pipeline.side_effect = capture_on_progress
 

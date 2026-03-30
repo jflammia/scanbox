@@ -20,7 +20,7 @@ from scanbox.api.sse import event_bus
 from scanbox.api.webhooks import dispatch_webhook_event
 from scanbox.config import Config
 from scanbox.database import Database
-from scanbox.models import SplitDocument
+from scanbox.models import PipelineResult
 from scanbox.pipeline.runner import PipelineContext, run_pipeline
 from scanbox.scanner.escl import ESCLClient
 
@@ -174,58 +174,76 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
                 {"batch_id": batch_id, "stage": stage_name, "detail": detail},
             )
 
-    documents: list[SplitDocument] = await run_pipeline(ctx, on_progress=on_progress)
+    result: PipelineResult = await run_pipeline(ctx, on_progress=on_progress)
 
-    # Create document records in DB using actual filenames from the pipeline
-    for doc in documents:
-        filename = doc.filename or f"{doc.document_type}_{doc.start_page}-{doc.end_page}.pdf"
-        await db.create_document(
-            batch_id=batch_id,
-            start_page=doc.start_page,
-            end_page=doc.end_page,
-            document_type=doc.document_type,
-            date_of_service=doc.date_of_service,
-            facility=doc.facility,
-            provider=doc.provider,
-            description=doc.description,
-            confidence=doc.confidence,
-            filename=filename,
+    if result.status == "completed":
+        documents = result.documents
+
+        # Create document records in DB using actual filenames from the pipeline
+        for doc in documents:
+            filename = doc.filename or f"{doc.document_type}_{doc.start_page}-{doc.end_page}.pdf"
+            await db.create_document(
+                batch_id=batch_id,
+                start_page=doc.start_page,
+                end_page=doc.end_page,
+                document_type=doc.document_type,
+                date_of_service=doc.date_of_service,
+                facility=doc.facility,
+                provider=doc.provider,
+                description=doc.description,
+                confidence=doc.confidence,
+                filename=filename,
+            )
+
+        await db.update_batch_state(batch_id, "review")
+        await event_bus.publish(batch_id, {"type": "done", "document_count": len(documents)})
+
+        # Dispatch webhook for processing completion
+        doc_summaries = [
+            {
+                "document_type": doc.document_type,
+                "date_of_service": doc.date_of_service,
+                "confidence": doc.confidence,
+            }
+            for doc in documents
+        ]
+        await dispatch_webhook_event(
+            "processing.completed",
+            {
+                "batch_id": batch_id,
+                "document_count": len(documents),
+                "documents": doc_summaries,
+            },
         )
 
-    await db.update_batch_state(batch_id, "review")
-    await event_bus.publish(batch_id, {"type": "done", "document_count": len(documents)})
+        # Flag low-confidence documents for review
+        for doc in documents:
+            if doc.confidence < 0.7:
+                await dispatch_webhook_event(
+                    "review.needed",
+                    {
+                        "batch_id": batch_id,
+                        "document_type": doc.document_type,
+                        "confidence": doc.confidence,
+                        "start_page": doc.start_page,
+                        "end_page": doc.end_page,
+                    },
+                )
 
-    # Dispatch webhook for processing completion
-    doc_summaries = [
-        {
-            "document_type": doc.document_type,
-            "date_of_service": doc.date_of_service,
-            "confidence": doc.confidence,
-        }
-        for doc in documents
-    ]
-    await dispatch_webhook_event(
-        "processing.completed",
-        {
-            "batch_id": batch_id,
-            "document_count": len(documents),
-            "documents": doc_summaries,
-        },
-    )
+    elif result.status == "paused":
+        await db.update_batch_state(batch_id, "paused")
+        await event_bus.publish(
+            batch_id,
+            {
+                "type": "pipeline_paused",
+                "stage": result.paused_stage,
+                "reason": result.paused_reason,
+            },
+        )
 
-    # Flag low-confidence documents for review
-    for doc in documents:
-        if doc.confidence < 0.7:
-            await dispatch_webhook_event(
-                "review.needed",
-                {
-                    "batch_id": batch_id,
-                    "document_type": doc.document_type,
-                    "confidence": doc.confidence,
-                    "start_page": doc.start_page,
-                    "end_page": doc.end_page,
-                },
-            )
+    elif result.status == "error":
+        await db.update_batch_state(batch_id, "error", error_message=result.error_message)
+        await event_bus.publish(batch_id, {"type": "error", "message": result.error_message})
 
 
 def _validate_pdf(data: bytes) -> None:
