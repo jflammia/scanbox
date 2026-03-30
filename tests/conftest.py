@@ -113,6 +113,70 @@ def load_test_pile(tmp_path, db):
 
 
 @pytest.fixture
+async def interleaved_batch(load_test_pile):
+    """Batch through interleave -- batch_dir has combined.pdf."""
+    from scanbox.pipeline.interleave import interleave_pages
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    return batch_id, ctx
+
+
+@pytest.fixture
+async def blanks_removed_batch(load_test_pile):
+    """Batch through blank removal -- batch_dir has cleaned.pdf."""
+    from scanbox.pipeline.blank_detect import remove_blank_pages
+    from scanbox.pipeline.interleave import interleave_pages
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    remove_blank_pages(
+        ctx.batch_dir / "combined.pdf",
+        ctx.batch_dir / "cleaned.pdf",
+        threshold=0.01,
+    )
+    return batch_id, ctx
+
+
+@pytest.fixture
+async def ocr_complete_batch(load_test_pile):
+    """Batch through OCR -- batch_dir has ocr.pdf + text_by_page.json.
+
+    Requires tesseract to be installed. Tests using this fixture should
+    be skipped if tesseract is not available.
+    """
+    from scanbox.pipeline.blank_detect import remove_blank_pages
+    from scanbox.pipeline.interleave import interleave_pages
+    from scanbox.pipeline.ocr import run_ocr
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    remove_blank_pages(
+        ctx.batch_dir / "combined.pdf",
+        ctx.batch_dir / "cleaned.pdf",
+        threshold=0.01,
+    )
+    run_ocr(
+        ctx.batch_dir / "cleaned.pdf",
+        ctx.batch_dir / "ocr.pdf",
+        ctx.batch_dir / "text_by_page.json",
+    )
+    return batch_id, ctx
+
+
+@pytest.fixture
 def sample_splits_json() -> list[dict]:
     """A typical AI split response for a 5-page, 3-document batch."""
     return [

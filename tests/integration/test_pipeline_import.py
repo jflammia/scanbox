@@ -1,9 +1,11 @@
 """Integration tests: load test pile fixtures and verify pipeline readiness."""
 
 import json
+import shutil
 from pathlib import Path
 
 import pikepdf
+import pytest
 
 SUITE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "test_suite"
 
@@ -55,3 +57,28 @@ class TestLoadTestPile:
         assert ctx.batch_num == 1
         assert ctx.scan_date is not None
         assert ctx.output_dir.exists()
+
+
+class TestStageFixtures:
+    async def test_interleaved_has_combined_pdf(self, interleaved_batch):
+        batch_id, ctx = interleaved_batch
+        assert (ctx.batch_dir / "combined.pdf").exists()
+        fronts = pikepdf.Pdf.open(ctx.batch_dir / "combined.pdf")
+        assert len(fronts.pages) >= 1
+
+    async def test_blanks_removed_has_cleaned_pdf(self, blanks_removed_batch):
+        batch_id, ctx = blanks_removed_batch
+        assert (ctx.batch_dir / "cleaned.pdf").exists()
+        cleaned = pikepdf.Pdf.open(ctx.batch_dir / "cleaned.pdf")
+        assert len(cleaned.pages) >= 1
+
+    @pytest.mark.skipif(
+        shutil.which("tesseract") is None,
+        reason="tesseract not installed",
+    )
+    async def test_ocr_complete_has_text(self, ocr_complete_batch):
+        batch_id, ctx = ocr_complete_batch
+        assert (ctx.batch_dir / "ocr.pdf").exists()
+        assert (ctx.batch_dir / "text_by_page.json").exists()
+        text_data = json.loads((ctx.batch_dir / "text_by_page.json").read_text())
+        assert len(text_data) >= 1
