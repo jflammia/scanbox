@@ -139,6 +139,7 @@ from scanbox.api.documents import router as documents_router  # noqa: E402
 from scanbox.api.persons import router as persons_router  # noqa: E402
 from scanbox.api.practice import router as practice_router  # noqa: E402
 from scanbox.api.scanner import router as scanner_router  # noqa: E402
+from scanbox.api.scanning import router as scanning_router  # noqa: E402
 from scanbox.api.sessions import router as sessions_router  # noqa: E402
 from scanbox.api.setup import router as setup_router  # noqa: E402
 from scanbox.api.views import router as views_router  # noqa: E402
@@ -152,5 +153,6 @@ app.include_router(documents_router)
 app.include_router(setup_router)
 app.include_router(practice_router)
 app.include_router(scanner_router)
+app.include_router(scanning_router)
 app.include_router(webhooks_router)
 app.include_router(views_router)

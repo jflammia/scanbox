@@ -4,13 +4,18 @@ Coordinates the eSCL scanner, pipeline runner, and database
 to perform the full scan-to-documents workflow.
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
+from typing import Annotated
 
 import pikepdf
+from fastapi import APIRouter, File, Form, UploadFile
+from fastapi.responses import JSONResponse
 
+from scanbox.api.import_batch import import_batch as do_import_batch
 from scanbox.api.sse import event_bus
 from scanbox.api.webhooks import dispatch_webhook_event
 from scanbox.config import Config
@@ -20,6 +25,8 @@ from scanbox.pipeline.runner import PipelineContext, run_pipeline
 from scanbox.scanner.escl import ESCLClient
 
 logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api", tags=["scanning"])
 
 
 async def _acquire_pages(scanner: ESCLClient, output_pdf: Path, on_page: callable = None) -> int:
@@ -219,3 +226,67 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
                     "end_page": doc.end_page,
                 },
             )
+
+
+def _validate_pdf(data: bytes) -> None:
+    """Raise ValueError if *data* is not a valid PDF."""
+    try:
+        pikepdf.Pdf.open(BytesIO(data))
+    except Exception as exc:
+        raise ValueError(str(exc)) from exc
+
+
+@router.post("/batches/import", status_code=201)
+async def import_batch_endpoint(
+    fronts: Annotated[UploadFile, File()],
+    backs: Annotated[UploadFile | None, File()] = None,
+    person_name: Annotated[str, Form()] = "Test Patient",
+):
+    """Import pre-made PDFs into a new batch, bypassing the scanner."""
+    from scanbox.main import get_db
+
+    cfg = Config()
+
+    # Read and validate fronts PDF
+    fronts_bytes = await fronts.read()
+    try:
+        _validate_pdf(fronts_bytes)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"detail": "Invalid fronts PDF"})
+
+    # Read and validate backs PDF if provided
+    backs_bytes = None
+    if backs is not None:
+        raw = await backs.read()
+        if raw:
+            try:
+                _validate_pdf(raw)
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "Invalid backs PDF"})
+            backs_bytes = raw
+
+    db = get_db()
+    result = await do_import_batch(
+        db=db,
+        data_dir=cfg.INTERNAL_DATA_DIR,
+        fronts_bytes=fronts_bytes,
+        backs_bytes=backs_bytes,
+        person_name=person_name,
+    )
+
+    # Launch pipeline processing in the background
+    asyncio.create_task(_run_processing(result.batch_id, db, has_backs=result.has_backs))
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "batch_id": result.batch_id,
+            "session_id": result.session_id,
+            "person_id": result.person_id,
+            "state": "processing",
+            "has_backs": result.has_backs,
+            "fronts_pages": result.fronts_page_count,
+            "backs_pages": result.backs_page_count,
+            "status_url": f"/api/batches/{result.batch_id}",
+        },
+    )
