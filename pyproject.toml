@@ -33,6 +33,7 @@ dev = [
     "respx>=0.22",
     "ruff>=0.15",
     "httpx[http2]>=0.28",
+    "fpdf2>=2.8",
 ]
 
 [tool.setuptools.packages.find]
