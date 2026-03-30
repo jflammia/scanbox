@@ -22,6 +22,7 @@ from scanbox.config import Config
 from scanbox.database import Database
 from scanbox.models import PipelineResult
 from scanbox.pipeline.runner import PipelineContext, run_pipeline
+from scanbox.pipeline.state import PipelineState
 from scanbox.scanner.escl import ESCLClient
 
 logger = logging.getLogger(__name__)
@@ -168,6 +169,17 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
             batch_id,
             {"type": event_type, "stage": stage_name, "detail": detail},
         )
+        # Emit stage_result event with the full result when complete
+        if complete:
+            state_path = batch_dir / "state.json"
+            if state_path.exists():
+                state = PipelineState.load(state_path)
+                stage_state = state.stages.get(stage_name)
+                if stage_state and stage_state.result:
+                    await event_bus.publish(
+                        batch_id,
+                        {"type": "stage_result", "stage": stage_name, "result": stage_state.result},
+                    )
         if not complete:
             await dispatch_webhook_event(
                 "processing.stage_completed",

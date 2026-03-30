@@ -3,6 +3,7 @@
 import asyncio
 from datetime import UTC, datetime
 from io import BytesIO
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -16,10 +17,21 @@ from scanbox.api.scanning import (
 from scanbox.api.webhooks import dispatch_webhook_event
 from scanbox.config import Config
 from scanbox.main import get_db
-from scanbox.models import SplitDocument
+from scanbox.models import ProcessingStage, SplitDocument
 from scanbox.pipeline.output import append_index_csv, write_archive, write_medical_records
+from scanbox.pipeline.state import PipelineState
 
 router = APIRouter(tags=["batches"])
+
+
+async def _get_batch_dir(batch_id: str) -> Path:
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    session = await db.get_session(batch["session_id"])
+    cfg = Config()
+    return cfg.sessions_dir / session["id"] / "batches" / batch_id
 
 
 @router.post("/api/sessions/{session_id}/batches", status_code=201)
@@ -50,6 +62,15 @@ async def get_batch(batch_id: str):
         raise HTTPException(status_code=404, detail="Batch not found")
     docs = await db.list_documents(batch_id)
     batch["document_count"] = len(docs)
+    # Add pipeline status for processing/paused/review/error states
+    if batch["state"] in ("processing", "paused", "review", "error"):
+        batch_dir = await _get_batch_dir(batch_id)
+        state_path = batch_dir / "state.json"
+        if state_path.exists():
+            state = PipelineState.load(state_path)
+            batch["pipeline_status"] = state.status
+            batch["current_stage"] = state.current_stage
+            batch["dlq_count"] = len(state.dlq)
     return batch
 
 
@@ -341,3 +362,142 @@ async def reprocess_batch(batch_id: str):
         "message": "Batch reprocessing started",
         "progress_url": f"/api/batches/{batch_id}/progress",
     }
+
+
+@router.get("/api/batches/{batch_id}/pipeline")
+async def get_pipeline_state(batch_id: str):
+    """Return full pipeline state as JSON."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    return {
+        "status": state.status,
+        "current_stage": state.current_stage,
+        "stages": {k: v.to_dict() for k, v in state.stages.items()},
+        "dlq": [item.to_dict() for item in state.dlq],
+        "config": state.config.to_dict(),
+    }
+
+
+@router.post("/api/batches/{batch_id}/pipeline/resume")
+async def resume_pipeline(batch_id: str):
+    """Resume a paused pipeline."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch or batch["state"] != "paused":
+        raise HTTPException(status_code=409, detail="Batch is not paused")
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    current = state.current_stage
+    if current:
+        state.resume_from(ProcessingStage(current))
+        state.save(batch_dir / "state.json")
+    has_backs = (batch_dir / "backs.pdf").exists()
+    asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
+    return {"status": "resuming", "from_stage": current}
+
+
+@router.post("/api/batches/{batch_id}/pipeline/retry")
+async def retry_pipeline_stage(batch_id: str):
+    """Retry the current failed stage."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch or batch["state"] not in ("paused", "error"):
+        raise HTTPException(status_code=409, detail="Batch is not paused or in error")
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    current = state.current_stage
+    if current:
+        state.resume_from(ProcessingStage(current))
+        state.save(batch_dir / "state.json")
+    has_backs = (batch_dir / "backs.pdf").exists()
+    asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
+    return {"status": "retrying", "stage": current}
+
+
+@router.post("/api/batches/{batch_id}/pipeline/skip")
+async def skip_pipeline_stage(batch_id: str):
+    """Skip the current stage and advance."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch or batch["state"] not in ("paused", "error"):
+        raise HTTPException(status_code=409, detail="Batch is not paused or in error")
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    current = state.current_stage
+    if current:
+        state.mark_skipped(ProcessingStage(current))
+        state.save(batch_dir / "state.json")
+    # Check if there are more stages; if so, trigger processing
+    if state.pending_stages():
+        has_backs = (batch_dir / "backs.pdf").exists()
+        asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
+        return {
+            "status": "skipped",
+            "stage": current,
+            "next_stage": state.pending_stages()[0].value,
+        }
+    # No more stages
+    await db.update_batch_state(batch_id, "review")
+    return {"status": "skipped", "stage": current, "next_stage": None}
+
+
+@router.post("/api/batches/{batch_id}/pipeline/advance")
+async def advance_pipeline(batch_id: str):
+    """Accept current results at a paused stage and continue to next stage."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch or batch["state"] != "paused":
+        raise HTTPException(status_code=409, detail="Batch is not paused")
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    current = state.current_stage
+    if current:
+        state.mark_completed(ProcessingStage(current), state.stages[current].result)
+        state.save(batch_dir / "state.json")
+    has_backs = (batch_dir / "backs.pdf").exists()
+    asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
+    return {"status": "advancing", "from_stage": current}
+
+
+@router.get("/api/batches/{batch_id}/pipeline/stage/{stage}")
+async def get_stage_result(batch_id: str, stage: str):
+    """Get results for a specific pipeline stage."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    if stage not in state.stages:
+        raise HTTPException(status_code=404, detail=f"Unknown stage: {stage}")
+    return state.stages[stage].to_dict()
+
+
+@router.get("/api/batches/{batch_id}/dlq")
+async def list_dlq(batch_id: str):
+    """List DLQ items for a batch."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    return {"items": [item.to_dict() for item in state.dlq]}
+
+
+@router.post("/api/batches/{batch_id}/dlq/{item_id}/retry")
+async def retry_dlq_item(batch_id: str, item_id: str):
+    """Retry a DLQ item."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    try:
+        state.remove_from_dlq(item_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"DLQ item {item_id} not found") from None
+    state.save(batch_dir / "state.json")
+    return {"status": "removed", "item_id": item_id, "message": "Item removed from DLQ for retry"}
+
+
+@router.delete("/api/batches/{batch_id}/dlq/{item_id}")
+async def discard_dlq_item(batch_id: str, item_id: str):
+    """Discard a DLQ item."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    try:
+        state.remove_from_dlq(item_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"DLQ item {item_id} not found") from None
+    state.save(batch_dir / "state.json")
+    return {"status": "discarded", "item_id": item_id}
