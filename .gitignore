@@ -25,6 +25,7 @@ Thumbs.db
 # ScanBox runtime
 output/
 *.pdf
+!tests/fixtures/**/*.pdf
 
 # Test artifacts
 .pytest_cache/

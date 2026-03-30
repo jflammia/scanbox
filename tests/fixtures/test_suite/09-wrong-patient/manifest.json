@@ -1,0 +1,263 @@
+{
+  "generated_at": "2026-03-30T16:06:48.312773+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 14,
+  "num_logical_pages": 19,
+  "documents": [
+    {
+      "name": "cbc_lab_report",
+      "description": "CBC with Differential + CMP -- Quest Diagnostics style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "chest_xray",
+      "description": "Chest X-Ray radiology report -- hospital style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "discharge_summary",
+      "description": "Hospital discharge summary -- Johns Hopkins style",
+      "pages": 3,
+      "single_sided": false
+    },
+    {
+      "name": "diabetes_care_plan",
+      "description": "Diabetes management care plan -- doctor's office style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "pathology_report",
+      "description": "Surgical pathology report -- dense small font",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "medication_list",
+      "description": "Pharmacy medication list -- CVS style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "insurance_eob",
+      "description": "Insurance explanation of benefits -- dense columnar",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "referral_letter",
+      "description": "Physician referral letter -- traditional letter format",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "pt_progress_note",
+      "description": "Physical therapy progress note -- SOAP format",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "immunization_record",
+      "description": "Immunization history -- government style",
+      "pages": 1,
+      "single_sided": true
+    },
+    {
+      "name": "operative_report",
+      "description": "Operative/surgical report -- formal surgical style",
+      "pages": 3,
+      "single_sided": false
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "cbc_lab_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "cbc_lab_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "chest_xray",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 2,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "discharge_summary",
+        "page": 2
+      }
+    },
+    {
+      "index": 3,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 3
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 4,
+      "front": {
+        "doc": "diabetes_care_plan",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "diabetes_care_plan",
+        "page": 2
+      }
+    },
+    {
+      "index": 5,
+      "front": {
+        "doc": "pathology_report",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 6,
+      "front": {
+        "doc": "cbc_lab_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "cbc_lab_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 7,
+      "front": {
+        "doc": "medication_list",
+        "page": 1
+      },
+      "back": {
+        "type": "near_blank_smudge",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 8,
+      "front": {
+        "doc": "insurance_eob",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "insurance_eob",
+        "page": 2
+      }
+    },
+    {
+      "index": 9,
+      "front": {
+        "doc": "referral_letter",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 10,
+      "front": {
+        "doc": "pt_progress_note",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "pt_progress_note",
+        "page": 2
+      }
+    },
+    {
+      "index": 11,
+      "front": {
+        "doc": "immunization_record",
+        "page": 1
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    },
+    {
+      "index": 12,
+      "front": {
+        "doc": "operative_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "operative_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 13,
+      "front": {
+        "doc": "operative_report",
+        "page": 3
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [
+    {
+      "type": "WrongPatientDocument",
+      "document_name": "cbc_lab_report",
+      "position": 6,
+      "result": "Inserted cbc_lab_report at position 6",
+      "patient": "Robert J. Thompson"
+    }
+  ],
+  "counts": {
+    "content_backs": 7,
+    "blank_backs": 6,
+    "near_blank_backs": 1
+  }
+}
