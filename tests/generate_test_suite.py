@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 
 from tests.medical_documents import (
-    DocumentEntry,
     PatientContext,
     PileConfig,
     generate_pile,
@@ -189,8 +188,8 @@ def pile_08_shuffled_pages() -> PileConfig:
         patient=DEFAULT_PATIENT,
         documents=ALL_DOCS,
         artifacts=[
-            ShufflePages(doc_index=2, order=[3, 1, 2]),   # Discharge: p3, p1, p2
-            ShufflePages(doc_index=10, order=[2, 3, 1]),   # Op report: p2, p3, p1
+            ShufflePages(doc_index=2, order=[3, 1, 2]),  # Discharge: p3, p1, p2
+            ShufflePages(doc_index=10, order=[2, 3, 1]),  # Op report: p2, p3, p1
         ],
         output_dir=SUITE_DIR / "08-shuffled-pages",
     )
@@ -253,17 +252,17 @@ def pile_12_chaos_kitchen_sink() -> PileConfig:
         patient=DEFAULT_PATIENT,
         documents=ALL_DOCS,
         artifacts=[
-            DuplicatePage(doc_index=0, page=1),              # CBC page 1 scanned twice
-            DuplicateDocument(doc_index=4),                   # Pathology report scanned twice
-            ShufflePages(doc_index=2, order=[1, 3, 2]),       # Discharge pages misordered
+            DuplicatePage(doc_index=0, page=1),  # CBC page 1 scanned twice
+            DuplicateDocument(doc_index=4),  # Pathology report scanned twice
+            ShufflePages(doc_index=2, order=[1, 3, 2]),  # Discharge pages misordered
             WrongPatientDocument(
                 document_name="insurance_eob",
                 patient=WRONG_PATIENT,
                 position=7,
             ),
-            BlankSheetInserted(position=3),                   # Random blank
-            BlankSheetInserted(position=10),                  # Another blank
-            RotatedPage(doc_index=7, page=1),                 # Referral letter upside-down
+            BlankSheetInserted(position=3),  # Random blank
+            BlankSheetInserted(position=10),  # Another blank
+            RotatedPage(doc_index=7, page=1),  # Referral letter upside-down
         ],
         output_dir=SUITE_DIR / "12-chaos-kitchen-sink",
     )
@@ -369,9 +368,7 @@ def verify_all() -> None:
         expected_docs = len(PILES[name]().documents)
         # Don't count artifact-inserted docs in expected count
         if num_docs < expected_docs:
-            errors.append(
-                f"manifest has {num_docs} documents, expected at least {expected_docs}"
-            )
+            errors.append(f"manifest has {num_docs} documents, expected at least {expected_docs}")
 
         # Check backs_order indicates reversed
         backs_order = manifest["backs_order"]
@@ -382,8 +379,7 @@ def verify_all() -> None:
         # Check fronts == backs page count
         if len(fronts_pdf.pages) != len(backs_pdf.pages):
             errors.append(
-                f"fronts ({len(fronts_pdf.pages)} pages) != "
-                f"backs ({len(backs_pdf.pages)} pages)"
+                f"fronts ({len(fronts_pdf.pages)} pages) != backs ({len(backs_pdf.pages)} pages)"
             )
 
         # Check each sheet has valid front doc reference
@@ -416,7 +412,7 @@ def verify_all() -> None:
             h = float(box[3]) - float(box[1])
             if abs(w - 612) > 2 or abs(h - 792) > 2:
                 errors.append(
-                    f"fronts page {page_idx+1} is {w:.0f}x{h:.0f} pts, "
+                    f"fronts page {page_idx + 1} is {w:.0f}x{h:.0f} pts, "
                     f"expected 612x792 (US Letter)"
                 )
 
@@ -427,8 +423,6 @@ def verify_all() -> None:
             for e in errors:
                 print(f"        {e}")
         else:
-            # Count back types for summary
-            counts = manifest.get("counts", {})
             print(
                 f"  OK    {name}: {num_sheets} sheets, "
                 f"{num_docs} docs, "
