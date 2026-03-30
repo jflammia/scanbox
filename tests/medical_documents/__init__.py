@@ -54,3 +54,11 @@ class PileConfig:
     documents: list[DocumentEntry | str]
     artifacts: list = field(default_factory=list)
     output_dir: Path = Path("tests/fixtures/medical_pile")
+
+
+def generate_pile(config: PileConfig) -> tuple[Path, Path]:
+    """Generate fronts.pdf and backs.pdf from a pile configuration."""
+    from tests.medical_documents.assembler import PileAssembler
+
+    assembler = PileAssembler()
+    return assembler.generate(config)

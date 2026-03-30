@@ -1,6 +1,5 @@
 """Tests for medical document generator core types."""
 
-
 from tests.medical_documents import DocumentDef, DocumentEntry, PatientContext, PileConfig
 from tests.medical_documents.assembler import (
     BlankSheetInserted,
