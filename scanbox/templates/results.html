@@ -15,6 +15,35 @@
     {% if batch %}in Batch {{ batch.batch_num }}{% endif %}
   </h1>
 
+  {% if pipeline_summary %}
+  <div x-data="{ showSummary: false }" class="bg-surface-raised border border-border rounded-lg p-4">
+    <button @click="showSummary = !showSummary"
+            class="flex items-center justify-between w-full text-left"
+            :aria-expanded="showSummary">
+      <span class="text-sm font-medium text-text-secondary">
+        <span class="text-status-success font-bold">&#10003;</span>
+        Processing complete
+      </span>
+      <span class="text-sm text-brand-600" x-text="showSummary ? 'Hide details' : 'Show details'"></span>
+    </button>
+    <div x-show="showSummary" x-transition class="mt-3 space-y-1">
+      {% for item in pipeline_summary %}
+      <p class="text-sm text-text-secondary ml-2">
+        <span class="text-status-success font-bold">&#10003;</span>
+        {{ item.label }} &mdash; {{ item.summary }}
+      </p>
+      {% endfor %}
+      {% if batch %}
+      <p class="text-sm mt-2 ml-2">
+        <a href="/pipeline/{{ batch.id }}" class="text-brand-600 hover:text-brand-700 no-underline">
+          Full pipeline details &rarr;
+        </a>
+      </p>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {% block cards %}
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for doc in documents %}

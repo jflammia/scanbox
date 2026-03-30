@@ -258,9 +258,144 @@ async def scanbox_adjust_boundaries(batch_id: str, boundaries: list[dict]) -> di
 
 @mcp.tool()
 async def scanbox_get_pipeline_status(batch_id: str) -> dict:
-    """Get the current processing stage and progress for a batch."""
+    """Get the current processing stage and progress for a batch.
+
+    For full pipeline state including stage results and DLQ items, use scanbox_get_pipeline_detail.
+    """
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/progress")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_get_pipeline_detail(batch_id: str) -> dict:
+    """Get full pipeline state including all stage results, DLQ items, and configuration.
+
+    Shows the status of every processing stage (interleaving, blank_removal, ocr, splitting,
+    naming), what each stage produced, any items in the dead letter queue, and pipeline
+    configuration.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/pipeline")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_pipeline_control(batch_id: str, action: str) -> dict:
+    """Control a paused or errored pipeline. Actions: resume, retry, skip, advance.
+
+    - resume: Continue processing from the paused stage
+    - retry: Re-run the current failed/paused stage
+    - skip: Skip the current stage and move to the next
+    - advance: Accept current results at a paused stage and continue
+
+    Only works when batch is in 'paused' or 'error' state.
+    """
+    if action not in ("resume", "retry", "skip", "advance"):
+        return {"error": f"Unknown action: {action}. Use: resume, retry, skip, advance"}
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(f"{_base_url()}/api/batches/{batch_id}/pipeline/{action}")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_get_stage_result(batch_id: str, stage: str) -> dict:
+    """Get the result of a specific pipeline stage.
+
+    Stages: interleaving, blank_removal, ocr, splitting, naming.
+    Returns status, timestamps, result data, and any errors.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/pipeline/stage/{stage}")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_list_dlq(batch_id: str) -> dict:
+    """List dead letter queue items for a batch.
+
+    DLQ items are documents or pages that had issues during processing
+    (low confidence, errors) and were deferred for manual review.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/batches/{batch_id}/dlq")
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_manage_dlq_item(batch_id: str, item_id: str, action: str) -> dict:
+    """Manage a dead letter queue item. Actions: retry, discard.
+
+    - retry: Remove from DLQ and push back for reprocessing
+    - discard: Permanently remove from DLQ (user decided it's not needed)
+    """
+    if action == "retry":
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(f"{_base_url()}/api/batches/{batch_id}/dlq/{item_id}/retry")
+            return resp.json()
+    elif action == "discard":
+        async with httpx.AsyncClient() as client:
+            resp = await client.delete(f"{_base_url()}/api/batches/{batch_id}/dlq/{item_id}")
+            return resp.json()
+    return {"error": f"Unknown action: {action}. Use: retry, discard"}
+
+
+@mcp.tool()
+async def scanbox_import_batch(
+    fronts_path: str,
+    backs_path: str = "",
+    person_name: str = "Test Patient",
+) -> dict:
+    """Import pre-made PDF files as a new batch, bypassing the scanner.
+
+    Provide file paths to fronts.pdf (required) and optionally backs.pdf.
+    Creates person, session, and batch records, then triggers pipeline processing.
+    Useful for testing and development without a physical scanner.
+    """
+    from pathlib import Path
+
+    fronts_file = Path(fronts_path)
+    if not fronts_file.exists():
+        return {"error": f"File not found: {fronts_path}"}
+
+    async with httpx.AsyncClient() as client:
+        files = {"fronts": ("fronts.pdf", fronts_file.read_bytes(), "application/pdf")}
+        if backs_path:
+            backs_file = Path(backs_path)
+            if not backs_file.exists():
+                return {"error": f"File not found: {backs_path}"}
+            files["backs"] = ("backs.pdf", backs_file.read_bytes(), "application/pdf")
+        data = {"person_name": person_name}
+        resp = await client.post(f"{_base_url()}/api/batches/import", files=files, data=data)
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_manage_exclusions(
+    batch_id: str,
+    action: str,
+    target_type: str,
+    target_id: int,
+) -> dict:
+    """Exclude or include pages/documents from a batch.
+
+    - action: "exclude" or "include"
+    - target_type: "page" or "document"
+    - target_id: page number (1-indexed) or document index (0-indexed)
+    """
+    if action == "exclude":
+        method = "POST"
+    elif action == "include":
+        method = "DELETE"
+    else:
+        return {"error": f"Unknown action: {action}. Use: exclude, include"}
+
+    if target_type not in ("page", "document"):
+        return {"error": f"Unknown target_type: {target_type}. Use: page, document"}
+
+    async with httpx.AsyncClient() as client:
+        url = f"{_base_url()}/api/batches/{batch_id}/exclude/{target_type}/{target_id}"
+        resp = await client.request(method, url)
         return resp.json()
 
 

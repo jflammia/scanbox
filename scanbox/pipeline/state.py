@@ -113,6 +113,8 @@ class PipelineState:
     stages: dict[str, StageState] = field(default_factory=dict)
     dlq: list[DLQItem] = field(default_factory=list)
     config: PipelineConfig = field(default_factory=PipelineConfig)
+    excluded_pages: list[int] = field(default_factory=list)
+    excluded_documents: list[int] = field(default_factory=list)
 
     @classmethod
     def new(cls, config: PipelineConfig | None = None) -> PipelineState:
@@ -134,7 +136,15 @@ class PipelineState:
         stages = {k: StageState.from_dict(v) for k, v in raw["stages"].items()}
         dlq = [DLQItem.from_dict(item) for item in raw.get("dlq", [])]
         cfg = PipelineConfig.from_dict(raw.get("config", {}))
-        return cls(stages=stages, dlq=dlq, config=cfg)
+        excluded_pages = raw.get("excluded_pages", [])
+        excluded_documents = raw.get("excluded_documents", [])
+        return cls(
+            stages=stages,
+            dlq=dlq,
+            config=cfg,
+            excluded_pages=excluded_pages,
+            excluded_documents=excluded_documents,
+        )
 
     @classmethod
     def _migrate_legacy(cls, raw: dict) -> PipelineState:
@@ -224,11 +234,31 @@ class PipelineState:
         msg = f"DLQ item {item_id!r} not found"
         raise ValueError(msg)
 
+    def exclude_page(self, page_num: int) -> None:
+        if page_num not in self.excluded_pages:
+            self.excluded_pages.append(page_num)
+            self.excluded_pages.sort()
+
+    def include_page(self, page_num: int) -> None:
+        if page_num in self.excluded_pages:
+            self.excluded_pages.remove(page_num)
+
+    def exclude_document(self, doc_index: int) -> None:
+        if doc_index not in self.excluded_documents:
+            self.excluded_documents.append(doc_index)
+            self.excluded_documents.sort()
+
+    def include_document(self, doc_index: int) -> None:
+        if doc_index in self.excluded_documents:
+            self.excluded_documents.remove(doc_index)
+
     def save(self, path: Path) -> None:
         data = {
             "stages": {k: v.to_dict() for k, v in self.stages.items()},
             "dlq": [item.to_dict() for item in self.dlq],
             "config": self.config.to_dict(),
+            "excluded_pages": self.excluded_pages,
+            "excluded_documents": self.excluded_documents,
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2))

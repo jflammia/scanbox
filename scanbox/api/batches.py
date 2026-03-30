@@ -501,3 +501,57 @@ async def discard_dlq_item(batch_id: str, item_id: str):
         raise HTTPException(status_code=404, detail=f"DLQ item {item_id} not found") from None
     state.save(batch_dir / "state.json")
     return {"status": "discarded", "item_id": item_id}
+
+
+# --- Exclusions ---
+
+
+@router.post("/api/batches/{batch_id}/exclude/page/{page_num}")
+async def exclude_page(batch_id: str, page_num: int):
+    """Exclude a page from the batch. Excluded pages are skipped during processing."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    state.exclude_page(page_num)
+    state.save(batch_dir / "state.json")
+    return {"excluded_pages": state.excluded_pages}
+
+
+@router.delete("/api/batches/{batch_id}/exclude/page/{page_num}")
+async def include_page(batch_id: str, page_num: int):
+    """Re-include a previously excluded page."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    state.include_page(page_num)
+    state.save(batch_dir / "state.json")
+    return {"excluded_pages": state.excluded_pages}
+
+
+@router.post("/api/batches/{batch_id}/exclude/document/{doc_index}")
+async def exclude_document(batch_id: str, doc_index: int):
+    """Exclude a document from the batch. Excluded documents are skipped during save."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    state.exclude_document(doc_index)
+    state.save(batch_dir / "state.json")
+    return {"excluded_documents": state.excluded_documents}
+
+
+@router.delete("/api/batches/{batch_id}/exclude/document/{doc_index}")
+async def include_document(batch_id: str, doc_index: int):
+    """Re-include a previously excluded document."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    state.include_document(doc_index)
+    state.save(batch_dir / "state.json")
+    return {"excluded_documents": state.excluded_documents}
+
+
+@router.get("/api/batches/{batch_id}/exclusions")
+async def get_exclusions(batch_id: str):
+    """Get all excluded pages and documents for a batch."""
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+    return {
+        "excluded_pages": state.excluded_pages,
+        "excluded_documents": state.excluded_documents,
+    }

@@ -60,13 +60,98 @@ async def scan_wizard(request: Request, session_id: str, batch_id: str):
     return templates.TemplateResponse(request, "scan.html", {"batch": batch, "session": session})
 
 
+# Stage labels for the pipeline page (plain English, keyed by ProcessingStage values)
+_PIPELINE_STAGE_LABELS: dict[str, str] = {
+    "interleaving": "Combining front and back pages",
+    "blank_removal": "Removing blank pages",
+    "ocr": "Reading text from documents",
+    "splitting": "Identifying document boundaries",
+    "naming": "Organizing and naming documents",
+}
+
+
+def _stage_result_summary(stage_key: str, result: dict) -> str:
+    """Return a short human-readable summary for a completed stage result."""
+    if stage_key == "interleaving" and result.get("total_pages"):
+        return f"{result['total_pages']} pages combined"
+    if stage_key == "blank_removal":
+        removed = result.get("removed_indices", [])
+        kept = result.get("kept_pages", result.get("total_pages", 0) - len(removed))
+        return f"{kept} pages kept, {len(removed)} blank removed"
+    if stage_key == "ocr":
+        return "Text recognition complete"
+    if stage_key == "splitting" and result.get("document_count"):
+        n = result["document_count"]
+        return f"{n} document{'s' if n != 1 else ''} found"
+    if stage_key == "naming" and result.get("documents_named"):
+        n = result["documents_named"]
+        return f"{n} document{'s' if n != 1 else ''} named"
+    return ""
+
+
+@router.get("/pipeline/{batch_id}")
+async def pipeline_page(request: Request, batch_id: str):
+    """Pipeline progress and control page."""
+    from fastapi import HTTPException
+
+    from scanbox.pipeline.state import PipelineState
+
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    session = await db.get_session(batch["session_id"])
+    person = await db.get_person(session["person_id"])
+
+    cfg = Config()
+    batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+    state = PipelineState.load(batch_dir / "state.json")
+
+    return templates.TemplateResponse(
+        request,
+        "pipeline.html",
+        {
+            "batch": batch,
+            "person": person,
+            "pipeline_status": state.status,
+            "stages": {k: v.to_dict() for k, v in state.stages.items()},
+            "dlq": [item.to_dict() for item in state.dlq],
+            "config": state.config.to_dict(),
+            "stage_labels": _PIPELINE_STAGE_LABELS,
+        },
+    )
+
+
 @router.get("/results/{batch_id}")
 async def results(request: Request, batch_id: str):
+    from scanbox.pipeline.state import PipelineState
+
     db = get_db()
     batch = await db.get_batch(batch_id)
     documents = await db.list_documents(batch_id)
+
+    # Load pipeline summary for the results page
+    pipeline_summary = []
+    if batch:
+        session = await db.get_session(batch["session_id"])
+        if session:
+            cfg = Config()
+            batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch["id"]
+            state_path = batch_dir / "state.json"
+            if state_path.exists():
+                state = PipelineState.load(state_path)
+                for key, label in _PIPELINE_STAGE_LABELS.items():
+                    ss = state.stages.get(key)
+                    if ss and ss.status.value == "completed" and ss.result:
+                        summary = _stage_result_summary(key, ss.result)
+                        if summary:
+                            pipeline_summary.append({"label": label, "summary": summary})
+
     return templates.TemplateResponse(
-        request, "results.html", {"batch": batch, "documents": documents}
+        request,
+        "results.html",
+        {"batch": batch, "documents": documents, "pipeline_summary": pipeline_summary},
     )
 
 
