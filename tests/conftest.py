@@ -1,12 +1,18 @@
 """Shared test fixtures."""
 
+import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
+from scanbox.api.import_batch import import_batch
 from scanbox.config import Config
+from scanbox.database import Database
+from scanbox.pipeline.runner import PipelineContext
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+SUITE_DIR = FIXTURES_DIR / "test_suite"
 
 
 @pytest.fixture
@@ -38,6 +44,136 @@ def tmp_config(tmp_path: Path) -> Config:
     cfg.INTERNAL_DATA_DIR.mkdir(parents=True)
     cfg.OUTPUT_DIR.mkdir(parents=True)
     return cfg
+
+
+@pytest.fixture
+async def db(tmp_path):
+    """Isolated database for testing."""
+    database = Database(tmp_path / "data" / "scanbox.db")
+    await database.init()
+    yield database
+    await database.close()
+
+
+@pytest.fixture
+def load_test_pile(tmp_path, db):
+    """Factory fixture: load a test suite pile into a ready-to-process state.
+
+    Usage:
+        batch_id, ctx = await load_test_pile("01-standard-clean")
+        docs = await run_pipeline(ctx)
+    """
+
+    async def _load(
+        pile_name: str,
+        person_name: str | None = None,
+    ) -> tuple[str, PipelineContext]:
+        pile_dir = SUITE_DIR / pile_name
+
+        # Read manifest for patient name
+        manifest_path = pile_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        if person_name is None:
+            person_name = manifest["patient"]["name"]
+
+        # Read PDF files
+        fronts_bytes = (pile_dir / "fronts.pdf").read_bytes()
+        backs_path = pile_dir / "backs.pdf"
+        backs_bytes = backs_path.read_bytes() if backs_path.exists() else None
+
+        # Import into database
+        data_dir = tmp_path / "data"
+        result = await import_batch(
+            db=db,
+            data_dir=data_dir,
+            fronts_bytes=fronts_bytes,
+            backs_bytes=backs_bytes,
+            person_name=person_name,
+        )
+
+        # Build PipelineContext
+        person = await db.get_person(result.person_id)
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(exist_ok=True)
+
+        ctx = PipelineContext(
+            batch_dir=result.batch_dir,
+            output_dir=output_dir,
+            person_name=person["display_name"],
+            person_slug=person["slug"],
+            person_folder=person["folder_name"],
+            batch_num=1,
+            scan_date=datetime.now(UTC).strftime("%Y-%m-%d"),
+            has_backs=result.has_backs,
+        )
+
+        return result.batch_id, ctx
+
+    return _load
+
+
+@pytest.fixture
+async def interleaved_batch(load_test_pile):
+    """Batch through interleave -- batch_dir has combined.pdf."""
+    from scanbox.pipeline.interleave import interleave_pages
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    return batch_id, ctx
+
+
+@pytest.fixture
+async def blanks_removed_batch(load_test_pile):
+    """Batch through blank removal -- batch_dir has cleaned.pdf."""
+    from scanbox.pipeline.blank_detect import remove_blank_pages
+    from scanbox.pipeline.interleave import interleave_pages
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    remove_blank_pages(
+        ctx.batch_dir / "combined.pdf",
+        ctx.batch_dir / "cleaned.pdf",
+        threshold=0.01,
+    )
+    return batch_id, ctx
+
+
+@pytest.fixture
+async def ocr_complete_batch(load_test_pile):
+    """Batch through OCR -- batch_dir has ocr.pdf + text_by_page.json.
+
+    Requires tesseract to be installed. Tests using this fixture should
+    be skipped if tesseract is not available.
+    """
+    from scanbox.pipeline.blank_detect import remove_blank_pages
+    from scanbox.pipeline.interleave import interleave_pages
+    from scanbox.pipeline.ocr import run_ocr
+
+    batch_id, ctx = await load_test_pile("06-minimal-quick")
+    interleave_pages(
+        ctx.batch_dir / "fronts.pdf",
+        ctx.batch_dir / "backs.pdf" if ctx.has_backs else None,
+        ctx.batch_dir / "combined.pdf",
+    )
+    remove_blank_pages(
+        ctx.batch_dir / "combined.pdf",
+        ctx.batch_dir / "cleaned.pdf",
+        threshold=0.01,
+    )
+    run_ocr(
+        ctx.batch_dir / "cleaned.pdf",
+        ctx.batch_dir / "ocr.pdf",
+        ctx.batch_dir / "text_by_page.json",
+    )
+    return batch_id, ctx
 
 
 @pytest.fixture
