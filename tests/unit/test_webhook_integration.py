@@ -2,6 +2,8 @@
 
 from unittest.mock import AsyncMock, patch
 
+from scanbox.models import PipelineResult
+
 
 class TestWebhookIntegrationInScanning:
     @patch("scanbox.api.scanning.dispatch_webhook_event", new_callable=AsyncMock)
@@ -60,7 +62,10 @@ class TestWebhookIntegrationInScanning:
 
         with (
             patch("scanbox.api.scanning.Config") as MockCfg,
-            patch("scanbox.api.scanning.run_pipeline", return_value=[low_conf_doc]),
+            patch(
+                "scanbox.api.scanning.run_pipeline",
+                return_value=PipelineResult(status="completed", documents=[low_conf_doc]),
+            ),
             patch("scanbox.api.scanning.event_bus", new_callable=AsyncMock),
         ):
             MockCfg.return_value.sessions_dir = AsyncMock()
