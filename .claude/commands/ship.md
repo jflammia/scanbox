@@ -136,9 +136,23 @@ gh pr checks <number> --watch --fail-fast
 | Docker Build | Missing system dep, syntax error | Check Dockerfile and dependencies |
 | Validate Conventional Commit | PR title format | `gh pr edit <number> --title "type: ..."` |
 
+**After all checks pass, verify zero warnings:**
+
+```
+gh run view <run-id> --log 2>&1 | grep '##\[warning\]'
+```
+
+This must produce **no output**. If any `##[warning]` lines appear, they must be fixed before merging. Common warnings:
+
+| Warning | Fix |
+|---------|-----|
+| Node.js deprecation on actions | Upgrade action to latest major version (e.g. `checkout@v6`) |
+| pip root user / upgrade notice | Add `--root-user-action=ignore --disable-pip-version-check` to Dockerfile |
+| Python DeprecationWarning | Fix the deprecated API usage in the code |
+
 ### 8. Squash-merge and delete the branch
 
-Only proceed here when `gh pr checks <number>` shows all checks passing.
+Only proceed here when all checks pass AND zero warnings exist.
 
 ```
 gh pr merge <number> --squash --delete-branch
