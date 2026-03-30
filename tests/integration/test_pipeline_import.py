@@ -73,8 +73,8 @@ class TestStageFixtures:
         assert len(cleaned.pages) >= 1
 
     @pytest.mark.skipif(
-        shutil.which("tesseract") is None,
-        reason="tesseract not installed",
+        shutil.which("ocrmypdf") is None,
+        reason="ocrmypdf not installed",
     )
     async def test_ocr_complete_has_text(self, ocr_complete_batch):
         batch_id, ctx = ocr_complete_batch
