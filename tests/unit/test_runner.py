@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import pikepdf
 
 from scanbox.models import ProcessingStage, SplitDocument
-from scanbox.pipeline.runner import PipelineContext, _read_state, _write_state, run_pipeline
+from scanbox.pipeline.runner import PipelineContext, _state_path, run_pipeline
+from scanbox.pipeline.state import PipelineState, StageStatus
 
 
 def _make_pdf(path: Path, num_pages: int = 3) -> None:
@@ -34,28 +35,37 @@ def _make_ctx(tmp_path: Path, has_backs: bool = False) -> PipelineContext:
 
 
 class TestPipelineState:
-    def test_read_state_default(self, tmp_path):
+    def test_load_state_default(self, tmp_path):
         ctx = _make_ctx(tmp_path)
-        state = _read_state(ctx)
-        assert state["stage"] == "interleaving"
+        state = PipelineState.load(_state_path(ctx))
+        assert state.current_stage == "interleaving"
 
-    def test_read_state_existing(self, tmp_path):
+    def test_load_state_existing(self, tmp_path):
         ctx = _make_ctx(tmp_path)
+        # Write a legacy format state.json
         (ctx.batch_dir / "state.json").write_text(json.dumps({"stage": "ocr"}))
-        state = _read_state(ctx)
-        assert state["stage"] == "ocr"
+        state = PipelineState.load(_state_path(ctx))
+        # Interleaving and blank_removal should be completed (migrated from legacy)
+        assert state.stages["interleaving"].status == StageStatus.COMPLETED
+        assert state.stages["blank_removal"].status == StageStatus.COMPLETED
+        assert state.current_stage == "ocr"
 
-    def test_write_state(self, tmp_path):
+    def test_save_state(self, tmp_path):
         ctx = _make_ctx(tmp_path)
-        _write_state(ctx, ProcessingStage.SPLITTING)
-        state = json.loads((ctx.batch_dir / "state.json").read_text())
-        assert state["stage"] == "splitting"
+        state = PipelineState.new()
+        state.mark_running(ProcessingStage.INTERLEAVING)
+        state.mark_completed(ProcessingStage.INTERLEAVING)
+        state.save(_state_path(ctx))
+        loaded = PipelineState.load(_state_path(ctx))
+        assert loaded.stages["interleaving"].status == StageStatus.COMPLETED
 
-    def test_write_state_with_extras(self, tmp_path):
+    def test_save_state_with_result(self, tmp_path):
         ctx = _make_ctx(tmp_path)
-        _write_state(ctx, ProcessingStage.DONE, document_count=5)
-        state = json.loads((ctx.batch_dir / "state.json").read_text())
-        assert state["document_count"] == 5
+        state = PipelineState.new()
+        state.mark_completed(ProcessingStage.SPLITTING, {"document_count": 5})
+        state.save(_state_path(ctx))
+        loaded = PipelineState.load(_state_path(ctx))
+        assert loaded.stages["splitting"].result == {"document_count": 5}
 
 
 class TestRunPipeline:
@@ -120,8 +130,10 @@ class TestRunPipeline:
         async def on_progress(stage: str, detail: str = "", complete: bool = False):
             progress_calls.append((stage, detail, complete))
 
-        docs = await run_pipeline(ctx, on_progress=on_progress)
+        result = await run_pipeline(ctx, on_progress=on_progress)
+        docs = result.documents
 
+        assert result.status == "completed"
         assert len(docs) == 2
         assert docs[0].document_type == "Lab Results"
         assert docs[1].document_type == "Letter"
@@ -150,9 +162,10 @@ class TestRunPipeline:
         pdf_files = list(docs_dir.glob("*.pdf"))
         assert len(pdf_files) == 2
 
-        # Verify state was written to DONE
-        state = json.loads((ctx.batch_dir / "state.json").read_text())
-        assert state["stage"] == "done"
+        # Verify state has all stages completed
+        state = PipelineState.load(_state_path(ctx))
+        for stage_name in ["interleaving", "blank_removal", "ocr", "splitting", "naming"]:
+            assert state.stages[stage_name].status == StageStatus.COMPLETED
 
     @patch("scanbox.pipeline.runner.split_documents")
     @patch("scanbox.pipeline.runner.run_ocr")
@@ -191,8 +204,10 @@ class TestRunPipeline:
             SplitDocument(start_page=1, end_page=3, document_type="Other", description="Doc")
         ]
 
-        docs = await run_pipeline(ctx)
+        result = await run_pipeline(ctx)
+        docs = result.documents
 
+        assert result.status == "completed"
         assert len(docs) == 1
         mock_interleave.assert_called_once()
         # Verify backs was passed
@@ -208,7 +223,7 @@ class TestRunPipeline:
         # Pre-create files from earlier stages
         _make_pdf(ctx.batch_dir / "combined.pdf", 2)
         _make_pdf(ctx.batch_dir / "cleaned.pdf", 2)
-        # Set checkpoint to OCR stage
+        # Set checkpoint to OCR stage (legacy format, will be migrated)
         (ctx.batch_dir / "state.json").write_text(json.dumps({"stage": "ocr"}))
 
         def fake_ocr(inp, out, text_json):
@@ -220,8 +235,10 @@ class TestRunPipeline:
             SplitDocument(start_page=1, end_page=2, document_type="Lab Results")
         ]
 
-        docs = await run_pipeline(ctx)
+        result = await run_pipeline(ctx)
+        docs = result.documents
 
+        assert result.status == "completed"
         assert len(docs) == 1
         mock_ocr.assert_called_once()
         mock_split.assert_called_once()
@@ -230,14 +247,21 @@ class TestRunPipeline:
         """Pipeline works without on_progress callback."""
         ctx = _make_ctx(tmp_path)
 
-        # Set state to naming with pre-existing splits
+        # Set state to naming with pre-existing splits using new format
         _make_pdf(ctx.batch_dir / "ocr.pdf", 1)
         splits = [{"start_page": 1, "end_page": 1, "document_type": "Other", "description": "X"}]
         (ctx.batch_dir / "splits.json").write_text(json.dumps(splits))
-        (ctx.batch_dir / "state.json").write_text(json.dumps({"stage": "naming"}))
+        # Write new-format state with all stages before naming completed
+        state = PipelineState.new()
+        state.mark_completed(ProcessingStage.INTERLEAVING)
+        state.mark_completed(ProcessingStage.BLANK_REMOVAL)
+        state.mark_completed(ProcessingStage.OCR)
+        state.mark_completed(ProcessingStage.SPLITTING)
+        state.save(_state_path(ctx))
 
-        docs = await run_pipeline(ctx, on_progress=None)
-        assert len(docs) == 1
+        result = await run_pipeline(ctx, on_progress=None)
+        assert result.status == "completed"
+        assert len(result.documents) == 1
 
     @patch("scanbox.pipeline.runner.split_documents")
     @patch("scanbox.pipeline.runner.run_ocr")
@@ -281,7 +305,8 @@ class TestRunPipeline:
             if complete:
                 done_calls.append((stage, detail))
 
-        await run_pipeline(ctx, on_progress=on_progress)
+        result = await run_pipeline(ctx, on_progress=on_progress)
+        assert result.status == "completed"
 
         done_map = dict(done_calls)
         assert "2 pages" in done_map["interleaving"]

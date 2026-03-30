@@ -45,6 +45,14 @@ class Config:
         self.OCR_LANGUAGE: str = os.getenv("OCR_LANGUAGE", "eng")
         self.DEFAULT_DPI: int = int(os.getenv("DEFAULT_DPI", "300"))
 
+        # Pipeline — stage-aware settings
+        self.PIPELINE_AUTO_ADVANCE_ON_ERROR: bool = os.getenv(
+            "PIPELINE_AUTO_ADVANCE_ON_ERROR", ""
+        ).lower() in ("true", "1", "yes")
+        self.PIPELINE_CONFIDENCE_THRESHOLD: float = float(
+            os.getenv("PIPELINE_CONFIDENCE_THRESHOLD", "0.7")
+        )
+
         # API authentication (optional — off by default for local use)
         self.SCANBOX_API_KEY: str = os.getenv("SCANBOX_API_KEY", "")
 
