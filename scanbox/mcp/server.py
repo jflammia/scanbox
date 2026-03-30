@@ -371,6 +371,35 @@ async def scanbox_import_batch(
 
 
 @mcp.tool()
+async def scanbox_manage_exclusions(
+    batch_id: str,
+    action: str,
+    target_type: str,
+    target_id: int,
+) -> dict:
+    """Exclude or include pages/documents from a batch.
+
+    - action: "exclude" or "include"
+    - target_type: "page" or "document"
+    - target_id: page number (1-indexed) or document index (0-indexed)
+    """
+    if action == "exclude":
+        method = "POST"
+    elif action == "include":
+        method = "DELETE"
+    else:
+        return {"error": f"Unknown action: {action}. Use: exclude, include"}
+
+    if target_type not in ("page", "document"):
+        return {"error": f"Unknown target_type: {target_type}. Use: page, document"}
+
+    async with httpx.AsyncClient() as client:
+        url = f"{_base_url()}/api/batches/{batch_id}/exclude/{target_type}/{target_id}"
+        resp = await client.request(method, url)
+        return resp.json()
+
+
+@mcp.tool()
 async def scanbox_reprocess_batch(batch_id: str) -> dict:
     """Re-run the processing pipeline on a batch's existing scans."""
     async with httpx.AsyncClient() as client:
