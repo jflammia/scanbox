@@ -26,6 +26,7 @@ class TestBatchState:
             "backs_done",
             "backs_skipped",
             "processing",
+            "paused",
             "review",
             "saved",
             "error",

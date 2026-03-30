@@ -15,6 +15,7 @@ class BatchState(StrEnum):
     BACKS_DONE = "backs_done"
     BACKS_SKIPPED = "backs_skipped"
     PROCESSING = "processing"
+    PAUSED = "paused"
     REVIEW = "review"
     SAVED = "saved"
     ERROR = "error"
@@ -48,6 +49,17 @@ class SplitDocument(BaseModel):
     confidence: float = 1.0
     user_edited: bool = False
     filename: str = ""
+
+
+class PipelineResult(BaseModel):
+    """Result from a pipeline run -- may be completed, paused, or errored."""
+
+    status: str  # "completed", "paused", "error"
+    documents: list[SplitDocument] = Field(default_factory=list)
+    paused_stage: str | None = None
+    paused_reason: str | None = None
+    error_stage: str | None = None
+    error_message: str | None = None
 
 
 class BatchInfo(BaseModel):
