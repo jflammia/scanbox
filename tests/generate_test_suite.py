@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 
 from tests.medical_documents import (
-    DocumentEntry,
     PatientContext,
     PileConfig,
     generate_pile,
@@ -427,8 +426,6 @@ def verify_all() -> None:
             for e in errors:
                 print(f"        {e}")
         else:
-            # Count back types for summary
-            counts = manifest.get("counts", {})
             print(
                 f"  OK    {name}: {num_sheets} sheets, "
                 f"{num_docs} docs, "
