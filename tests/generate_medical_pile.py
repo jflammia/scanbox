@@ -8,7 +8,6 @@ Usage:
 """
 
 import sys
-from pathlib import Path
 
 from tests.medical_documents import PatientContext, PileConfig, generate_pile
 from tests.medical_documents.assembler import (
