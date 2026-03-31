@@ -29,16 +29,23 @@ class TestHomePageSessions:
         assert resp.status_code == 200
         assert "Jane Doe" in resp.text
 
-    async def test_session_link_resolves_to_valid_results(self, client: AsyncClient):
-        """Clicking a past session link should reach a valid results page."""
+    async def test_session_link_resolves_to_valid_page(self, client: AsyncClient):
+        """Clicking a past session link should reach a valid page for the batch state."""
+        from scanbox.main import get_db
+
         person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
 
-        # The home page session link must lead to a working page
+        # Scanning state links to scan wizard
         resp = await client.get("/")
         assert resp.status_code == 200
-        # Session entry should link to results via batch_id (not session_id)
+        assert f"/scan/{session['id']}/{batch['id']}" in resp.text
+
+        # Review state links to results
+        db = get_db()
+        await db.update_batch_state(batch["id"], "review")
+        resp = await client.get("/")
         assert f"/results/{batch['id']}" in resp.text
 
 

@@ -39,6 +39,7 @@ async def home(request: Request):
                 **s,
                 "person_name": persons_map.get(s["person_id"], "Unknown"),
                 "latest_batch_id": latest_batch["id"] if latest_batch else None,
+                "batch_state": latest_batch["state"] if latest_batch else None,
                 "document_count": len(docs),
             }
         )
@@ -139,12 +140,26 @@ async def pipeline_page(request: Request, batch_id: str):
     )
 
 
+_IN_PROGRESS = {"scanning_fronts", "fronts_done", "scanning_backs", "backs_done"}
+_PIPELINE_ACTIVE = {"processing", "paused"}
+
+
 @router.get("/results/{batch_id}")
 async def results(request: Request, batch_id: str):
     from scanbox.pipeline.state import PipelineState
 
     db = get_db()
     batch = await db.get_batch(batch_id)
+
+    # Redirect in-progress batches to the appropriate page
+    if batch:
+        state = batch.get("state", "")
+        if state in _IN_PROGRESS:
+            session = await db.get_session(batch["session_id"])
+            return RedirectResponse(url=f"/scan/{session['id']}/{batch_id}", status_code=303)
+        if state in _PIPELINE_ACTIVE:
+            return RedirectResponse(url=f"/pipeline/{batch_id}", status_code=303)
+
     documents = await db.list_documents(batch_id)
 
     # Load pipeline summary and exclusion data from state.json
@@ -627,7 +642,7 @@ def _render_progress_event(event: dict, batch_id: str) -> str:
         return f'<div class="ml-4 text-text-secondary text-sm">Page {page} scanned</div>'
 
     if etype == "scan_complete":
-        count = event.get("count", 0)
+        count = event.get("pages", 0)
         return (
             f'<div class="flex items-center gap-2 font-medium">'
             f"{_CHECK} Scanned {count} pages</div>"
@@ -644,7 +659,7 @@ def _render_progress_event(event: dict, batch_id: str) -> str:
         )
 
     if etype == "done":
-        count = event.get("count", 0)
+        count = event.get("document_count", 0)
         return (
             f'<div class="flex items-center gap-2 font-medium text-status-success">'
             f"{_CHECK} All done! {count} document{'s' if count != 1 else ''} ready for review</div>"
