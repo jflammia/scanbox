@@ -27,6 +27,18 @@ class TestHealth:
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
 
+    async def test_health_includes_version(self, client: AsyncClient, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "20260331-abc1234")
+        resp = await client.get("/api/health")
+        assert resp.status_code == 200
+        assert resp.json()["version"] == "20260331-abc1234"
+
+    async def test_health_version_defaults_to_dev(self, client: AsyncClient, monkeypatch):
+        monkeypatch.delenv("APP_VERSION", raising=False)
+        resp = await client.get("/api/health")
+        assert resp.status_code == 200
+        assert resp.json()["version"] == "dev"
+
 
 class TestPersonsAPI:
     async def test_create_person(self, client: AsyncClient):

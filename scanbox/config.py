@@ -53,6 +53,9 @@ class Config:
             os.getenv("PIPELINE_CONFIDENCE_THRESHOLD", "0.7")
         )
 
+        # Version (set by Docker build arg, defaults to "dev" for local dev)
+        self.APP_VERSION: str = os.getenv("APP_VERSION", "dev")
+
         # API authentication (optional — off by default for local use)
         self.SCANBOX_API_KEY: str = os.getenv("SCANBOX_API_KEY", "")
 

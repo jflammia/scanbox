@@ -125,7 +125,7 @@ async def health():
     overall = "ok"
     if checks["database"] != "ok":
         overall = "degraded"
-    return {"status": overall, **checks}
+    return {"status": overall, "version": cfg.APP_VERSION, **checks}
 
 
 # Static files
