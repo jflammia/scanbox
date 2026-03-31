@@ -61,18 +61,14 @@
           </select>
         </div>
 
-        {# Ollama: URL → auto-check → model dropdown #}
+        {# Ollama: URL → auto-check on load and change → model dropdown #}
         <div x-show="provider === 'ollama'" x-transition>
           <label class="block text-sm font-medium text-text-secondary mb-1">Ollama Server URL</label>
           <input type="text" name="llm_url" value="{{ llm_url }}" placeholder="http://localhost:11434"
-                 hx-post="/settings/llm/check-url" hx-trigger="change, keyup changed delay:500ms"
+                 hx-post="/settings/llm/check-url" hx-trigger="load, change, keyup changed delay:500ms"
                  hx-target="#ollama-models" hx-swap="innerHTML" hx-include="[name='llm_url']"
                  class="w-full border border-border rounded-md px-4 py-2 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <div id="ollama-models" class="mt-2">
-            {% if llm_provider == 'ollama' and llm_url %}
-            <p class="text-text-muted text-sm">Change the URL or press Enter to check connectivity and load models.</p>
-            {% endif %}
-          </div>
+          <div id="ollama-models" class="mt-2"></div>
         </div>
 
         {# Cloud: API key + manual model #}
@@ -84,9 +80,9 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1">Model</label>
-            <input type="text" name="llm_model" value="{{ llm_model if llm_provider != 'ollama' else '' }}"
+            <input type="text" value="{{ llm_model if llm_provider != 'ollama' else '' }}"
                    placeholder="e.g. claude-haiku-4-5-20251001 or gpt-4o-mini"
-                   :disabled="provider === 'ollama'"
+                   :name="provider !== 'ollama' ? 'llm_model' : ''"
                    class="w-full border border-border rounded-md px-4 py-2 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
           </div>
         </div>
