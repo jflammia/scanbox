@@ -166,13 +166,14 @@
   <section class="space-y-3">
     <h2 class="text-xl font-semibold">Items needing attention</h2>
     <p class="text-sm text-text-secondary">
-      These items had issues during processing. You can retry or discard them.
+      These items had issues during processing. You can edit, retry, or discard them.
     </p>
 
     <div id="dlq-list" class="space-y-3">
       {% for item in dlq %}
       <div class="bg-surface-raised border-2 border-status-warning rounded-lg p-4"
-           id="dlq-{{ item.id }}">
+           id="dlq-{{ item.id }}"
+           x-data="{ editing: false }">
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">
             <p class="font-medium text-text-primary">
@@ -196,8 +197,12 @@
             {% endif %}
             <p class="text-xs text-text-muted">Added {{ item.added_at[:19] | replace("T", " ") }}</p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2" x-show="!editing">
             <button class="text-sm px-3 py-1 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
+                    @click="editing = true">
+              Edit &amp; Resolve
+            </button>
+            <button class="text-sm px-3 py-1 rounded-md bg-white text-brand-600 border border-border hover:bg-gray-100 transition-colors"
                     hx-post="/api/batches/{{ batch.id }}/dlq/{{ item.id }}/retry"
                     hx-target="#dlq-{{ item.id }}"
                     hx-swap="outerHTML"
@@ -210,6 +215,70 @@
                     hx-swap="outerHTML"
                     hx-on::after-request="window.location.reload()">
               Discard
+            </button>
+          </div>
+        </div>
+
+        {# Inline edit form #}
+        <div x-show="editing" x-transition class="mt-4 border-t border-border pt-4 space-y-3">
+          <h3 class="font-semibold text-sm">Provide correct details</h3>
+
+          <label class="block text-sm font-medium">
+            Document Type
+            <select id="dlq-{{ item.id }}-type" class="w-full border border-border rounded-md p-2 mt-1">
+              {% for dt in document_types %}
+              <option value="{{ dt }}" {% if item.document and item.document.document_type == dt %}selected{% endif %}>{{ dt }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="block text-sm font-medium">
+            Date of Service
+            <input type="text" id="dlq-{{ item.id }}-date"
+                   value="{{ item.document.date_of_service if item.document and item.document.date_of_service else '' }}"
+                   placeholder="e.g. 2026-03-15"
+                   class="w-full border border-border rounded-md p-2 mt-1">
+          </label>
+
+          <label class="block text-sm font-medium">
+            Facility
+            <input type="text" id="dlq-{{ item.id }}-facility"
+                   value="{{ item.document.facility if item.document and item.document.facility else '' }}"
+                   class="w-full border border-border rounded-md p-2 mt-1">
+          </label>
+
+          <label class="block text-sm font-medium">
+            Provider
+            <input type="text" id="dlq-{{ item.id }}-provider"
+                   value="{{ item.document.provider if item.document and item.document.provider else '' }}"
+                   class="w-full border border-border rounded-md p-2 mt-1">
+          </label>
+
+          <label class="block text-sm font-medium">
+            Description
+            <input type="text" id="dlq-{{ item.id }}-desc"
+                   value="{{ item.document.description if item.document and item.document.description else '' }}"
+                   class="w-full border border-border rounded-md p-2 mt-1">
+          </label>
+
+          <div class="flex gap-2">
+            <button class="bg-brand-600 text-white px-4 py-2 rounded-md font-medium hover:bg-brand-700 transition-colors"
+                    hx-post="/api/batches/{{ batch.id }}/dlq/{{ item.id }}/resolve"
+                    hx-vals='js:{
+                      document_type: document.getElementById("dlq-{{ item.id }}-type").value,
+                      date_of_service: document.getElementById("dlq-{{ item.id }}-date").value,
+                      facility: document.getElementById("dlq-{{ item.id }}-facility").value,
+                      provider: document.getElementById("dlq-{{ item.id }}-provider").value,
+                      description: document.getElementById("dlq-{{ item.id }}-desc").value
+                    }'
+                    hx-target="#dlq-{{ item.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="window.location.reload()">
+              Save &amp; Resolve
+            </button>
+            <button class="px-4 py-2 border border-border rounded-md font-medium text-text-primary"
+                    @click="editing = false">
+              Cancel
             </button>
           </div>
         </div>

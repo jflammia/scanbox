@@ -341,6 +341,35 @@ async def scanbox_manage_dlq_item(batch_id: str, item_id: str, action: str) -> d
 
 
 @mcp.tool()
+async def scanbox_resolve_dlq_item(
+    batch_id: str,
+    item_id: str,
+    document_type: str,
+    date_of_service: str = "unknown",
+    facility: str = "unknown",
+    provider: str = "unknown",
+    description: str = "Document",
+) -> dict:
+    """Manually resolve a DLQ item by providing correct document metadata.
+
+    Use this when the AI splitter was uncertain but you know what the document is.
+    Sets confidence to 1.0 (human-verified) and removes from DLQ.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{_base_url()}/api/batches/{batch_id}/dlq/{item_id}/resolve",
+            json={
+                "document_type": document_type,
+                "date_of_service": date_of_service,
+                "facility": facility,
+                "provider": provider,
+                "description": description,
+            },
+        )
+        return resp.json()
+
+
+@mcp.tool()
 async def scanbox_import_batch(
     fronts_path: str,
     backs_path: str = "",

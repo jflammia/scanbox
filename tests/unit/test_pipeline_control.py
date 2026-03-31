@@ -263,3 +263,233 @@ class TestPipelineControl:
         for stage in ["interleaving", "blank_removal", "ocr", "splitting", "naming"]:
             assert state.stages[stage].status == StageStatus.COMPLETED
             assert state.stages[stage].result is not None
+
+
+class TestExclusionsInPipeline:
+    @patch("scanbox.pipeline.runner.split_documents")
+    @patch("scanbox.pipeline.runner.run_ocr")
+    @patch("scanbox.pipeline.runner.remove_blank_pages")
+    @patch("scanbox.pipeline.runner.interleave_pages")
+    async def test_excluded_pages_not_sent_to_splitter(
+        self, mock_interleave, mock_blank, mock_ocr, mock_split, tmp_path
+    ):
+        """Excluded pages are filtered from the text sent to the AI splitter."""
+        ctx = _make_ctx(tmp_path)
+        _make_pdf(ctx.batch_dir / "fronts.pdf", 3)
+
+        def fake_interleave(fronts, backs, output):
+            _make_pdf(output, 3)
+
+        mock_interleave.side_effect = fake_interleave
+
+        mock_result = MagicMock()
+        mock_result.removed_indices = []
+        mock_result.total_pages = 3
+
+        def fake_blank(inp, out, threshold):
+            _make_pdf(out, 3)
+            return mock_result
+
+        mock_blank.side_effect = fake_blank
+
+        def fake_ocr(inp, out, text_json):
+            _make_pdf(out, 3)
+            text_json.write_text(json.dumps({"1": "Page 1", "2": "Page 2", "3": "Page 3"}))
+
+        mock_ocr.side_effect = fake_ocr
+
+        mock_split.return_value = [
+            SplitDocument(
+                start_page=1,
+                end_page=2,
+                document_type="Lab Results",
+                description="Blood Panel",
+                confidence=0.95,
+            ),
+        ]
+
+        # Pre-write state with page 3 excluded
+        cfg = PipelineConfig()
+        state = PipelineState.new(cfg)
+        state.exclude_page(3)
+        state.save(ctx.batch_dir / "state.json")
+
+        await run_pipeline(ctx, pipeline_config=cfg)
+
+        # Verify the splitter only received pages 1 and 2
+        call_args = mock_split.call_args
+        page_texts = call_args[0][0]
+        assert 3 not in page_texts
+        assert 1 in page_texts
+        assert 2 in page_texts
+
+    @patch("scanbox.pipeline.runner.split_documents")
+    @patch("scanbox.pipeline.runner.run_ocr")
+    @patch("scanbox.pipeline.runner.remove_blank_pages")
+    @patch("scanbox.pipeline.runner.interleave_pages")
+    async def test_all_pages_excluded_produces_empty_result(
+        self, mock_interleave, mock_blank, mock_ocr, mock_split, tmp_path
+    ):
+        """When all pages are excluded, splitting produces zero documents."""
+        ctx = _make_ctx(tmp_path)
+        _make_pdf(ctx.batch_dir / "fronts.pdf", 2)
+
+        def fake_interleave(fronts, backs, output):
+            _make_pdf(output, 2)
+
+        mock_interleave.side_effect = fake_interleave
+
+        mock_result = MagicMock()
+        mock_result.removed_indices = []
+        mock_result.total_pages = 2
+
+        def fake_blank(inp, out, threshold):
+            _make_pdf(out, 2)
+            return mock_result
+
+        mock_blank.side_effect = fake_blank
+
+        def fake_ocr(inp, out, text_json):
+            _make_pdf(out, 2)
+            text_json.write_text(json.dumps({"1": "Page 1", "2": "Page 2"}))
+
+        mock_ocr.side_effect = fake_ocr
+
+        # Pre-write state with all pages excluded
+        cfg = PipelineConfig()
+        state = PipelineState.new(cfg)
+        state.exclude_page(1)
+        state.exclude_page(2)
+        state.save(ctx.batch_dir / "state.json")
+
+        result = await run_pipeline(ctx, pipeline_config=cfg)
+
+        # Splitter should not be called at all
+        mock_split.assert_not_called()
+        assert result.status == "completed"
+        assert len(result.documents) == 0
+
+    @patch("scanbox.pipeline.runner.split_documents")
+    @patch("scanbox.pipeline.runner.run_ocr")
+    @patch("scanbox.pipeline.runner.remove_blank_pages")
+    @patch("scanbox.pipeline.runner.interleave_pages")
+    async def test_excluded_documents_not_in_result(
+        self, mock_interleave, mock_blank, mock_ocr, mock_split, tmp_path
+    ):
+        """Excluded documents are filtered from the final pipeline result."""
+        ctx = _make_ctx(tmp_path)
+        _make_pdf(ctx.batch_dir / "fronts.pdf", 3)
+
+        def fake_interleave(fronts, backs, output):
+            _make_pdf(output, 3)
+
+        mock_interleave.side_effect = fake_interleave
+
+        mock_result = MagicMock()
+        mock_result.removed_indices = []
+        mock_result.total_pages = 3
+
+        def fake_blank(inp, out, threshold):
+            _make_pdf(out, 3)
+            return mock_result
+
+        mock_blank.side_effect = fake_blank
+
+        def fake_ocr(inp, out, text_json):
+            _make_pdf(out, 3)
+            text_json.write_text(json.dumps({"1": "A", "2": "B", "3": "C"}))
+
+        mock_ocr.side_effect = fake_ocr
+
+        mock_split.return_value = [
+            SplitDocument(
+                start_page=1,
+                end_page=2,
+                document_type="Lab Results",
+                description="Blood Panel",
+                confidence=0.95,
+            ),
+            SplitDocument(
+                start_page=3,
+                end_page=3,
+                document_type="Letter",
+                description="Cover Letter",
+                confidence=0.9,
+            ),
+        ]
+
+        # Pre-write state with document index 1 excluded (the Letter)
+        cfg = PipelineConfig()
+        state = PipelineState.new(cfg)
+        state.exclude_document(1)
+        state.save(ctx.batch_dir / "state.json")
+
+        result = await run_pipeline(ctx, pipeline_config=cfg)
+
+        assert result.status == "completed"
+        # Only 1 document in result (the excluded one is filtered)
+        assert len(result.documents) == 1
+        assert result.documents[0].document_type == "Lab Results"
+
+    @patch("scanbox.pipeline.runner.split_documents")
+    @patch("scanbox.pipeline.runner.run_ocr")
+    @patch("scanbox.pipeline.runner.remove_blank_pages")
+    @patch("scanbox.pipeline.runner.interleave_pages")
+    async def test_excluded_documents_skipped_in_naming(
+        self, mock_interleave, mock_blank, mock_ocr, mock_split, tmp_path
+    ):
+        """Excluded documents don't get PDF files extracted during naming."""
+        ctx = _make_ctx(tmp_path)
+        _make_pdf(ctx.batch_dir / "fronts.pdf", 3)
+
+        def fake_interleave(fronts, backs, output):
+            _make_pdf(output, 3)
+
+        mock_interleave.side_effect = fake_interleave
+
+        mock_result = MagicMock()
+        mock_result.removed_indices = []
+        mock_result.total_pages = 3
+
+        def fake_blank(inp, out, threshold):
+            _make_pdf(out, 3)
+            return mock_result
+
+        mock_blank.side_effect = fake_blank
+
+        def fake_ocr(inp, out, text_json):
+            _make_pdf(out, 3)
+            text_json.write_text(json.dumps({"1": "A", "2": "B", "3": "C"}))
+
+        mock_ocr.side_effect = fake_ocr
+
+        mock_split.return_value = [
+            SplitDocument(
+                start_page=1,
+                end_page=2,
+                document_type="Lab Results",
+                description="Blood Panel",
+                confidence=0.95,
+            ),
+            SplitDocument(
+                start_page=3,
+                end_page=3,
+                document_type="Letter",
+                description="Cover Letter",
+                confidence=0.9,
+            ),
+        ]
+
+        # Exclude document 1 (the Letter)
+        cfg = PipelineConfig()
+        state = PipelineState.new(cfg)
+        state.exclude_document(1)
+        state.save(ctx.batch_dir / "state.json")
+
+        await run_pipeline(ctx, pipeline_config=cfg)
+
+        # The naming stage result should report the exclusion
+        state = PipelineState.load(ctx.batch_dir / "state.json")
+        naming_result = state.stages["naming"].result
+        assert naming_result["documents_named"] == 1
+        assert naming_result["documents_excluded"] == 1

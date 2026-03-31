@@ -314,4 +314,4 @@ class TestRunPipeline:
         assert "1 blank removed" in done_map["blank_removal"]
         assert done_map["ocr"] == "OCR complete"
         assert "1 documents" in done_map["splitting"]
-        assert done_map["naming"] == "All documents named"
+        assert "1 documents named" in done_map["naming"]
