@@ -99,21 +99,19 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
     """
     found: list[DiscoveredScanner] = []
     loop = asyncio.get_running_loop()
-    zeroconf = AsyncZeroconf(ip_version=IPVersion.V4Only)
+    azc = AsyncZeroconf(ip_version=IPVersion.V4Only)
 
     def on_service_state_change(
-        zeroconf_instance: AsyncZeroconf,
+        zeroconf,  # Zeroconf (sync) from callback — ignored, we use azc instead
         service_type: str,
         name: str,
         state_change: ServiceStateChange,
     ) -> None:
         if state_change is ServiceStateChange.Added:
-            asyncio.run_coroutine_threadsafe(
-                _resolve_and_add(zeroconf_instance, service_type, name, found), loop
-            )
+            asyncio.run_coroutine_threadsafe(_resolve_and_add(azc, service_type, name, found), loop)
 
     browser = AsyncServiceBrowser(
-        zeroconf.zeroconf,
+        azc.zeroconf,
         ESCL_SERVICE_TYPES,
         handlers=[on_service_state_change],
     )
@@ -122,7 +120,7 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
         await asyncio.sleep(timeout)
     finally:
         await browser.async_cancel()
-        await zeroconf.async_close()
+        await azc.async_close()
 
     return _dedup_scanners(found)
 

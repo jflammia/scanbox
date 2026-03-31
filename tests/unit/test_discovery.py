@@ -265,10 +265,12 @@ class TestDiscoverScanners:
 
             async def trigger_handler_from_thread(timeout):
                 handler = captured_handlers[0]
+                # AsyncServiceBrowser passes the underlying Zeroconf (sync),
+                # NOT the AsyncZeroconf wrapper — this is what caused GH-82
                 t = threading.Thread(
                     target=handler,
                     args=(
-                        mock_zeroconf,
+                        mock_zeroconf.zeroconf,
                         "_uscan._tcp.local.",
                         "HP Scanner._uscan._tcp.local.",
                         ServiceStateChange.Added,
