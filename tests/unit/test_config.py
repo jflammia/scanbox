@@ -166,12 +166,21 @@ class TestConfigEnvOverrides:
     def test_version_uses_git_hash_when_dev(self, monkeypatch):
         monkeypatch.setenv("APP_VERSION", "dev")
         monkeypatch.setenv("GIT_COMMIT", "abc1234def5678")
+        monkeypatch.delenv("BUILD_TIME", raising=False)
         c = Config()
         assert c.APP_VERSION == "gabc1234"
+
+    def test_version_includes_build_time(self, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "dev")
+        monkeypatch.setenv("GIT_COMMIT", "abc1234def5678")
+        monkeypatch.setenv("BUILD_TIME", "2026-03-31 17:00")
+        c = Config()
+        assert c.APP_VERSION == "2026-03-31 17:00 (gabc1234)"
 
     def test_version_preserves_explicit_release(self, monkeypatch):
         monkeypatch.setenv("APP_VERSION", "1.3.0")
         monkeypatch.setenv("GIT_COMMIT", "abc1234def5678")
+        monkeypatch.setenv("BUILD_TIME", "2026-03-31 17:00")
         c = Config()
         assert c.APP_VERSION == "1.3.0"
 

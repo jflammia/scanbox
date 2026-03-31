@@ -2,6 +2,7 @@ FROM python:3.13-slim AS base
 
 ARG APP_VERSION=dev
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=
 
 LABEL org.opencontainers.image.title="ScanBox"
 LABEL org.opencontainers.image.description="Medical document scanning pipeline"
@@ -36,6 +37,7 @@ USER scanbox
 ENV PYTHONUNBUFFERED=1
 ENV APP_VERSION=${APP_VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
+ENV BUILD_TIME=${BUILD_TIME}
 
 EXPOSE 8090
 
