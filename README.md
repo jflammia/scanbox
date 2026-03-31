@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="static/img/logo.svg" alt="ScanBox" width="240">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="static/img/logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="static/img/logo-light.svg">
+  <img src="static/img/logo-light.svg" alt="ScanBox" width="240">
+</picture>
 
 ### Scan, split, and organize stacks of documents — from your browser, your AI agent, or a script.
 
