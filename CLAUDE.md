@@ -4,11 +4,11 @@ Development guide for AI agents working on ScanBox.
 
 ## Project Overview
 
-ScanBox is a **fully implemented** self-hosted Docker application that controls a network scanner via eSCL, processes scans through an automated pipeline, and outputs professionally named documents. 532 tests, 94% coverage, all three phases complete.
+ScanBox is a **fully implemented** self-hosted Docker application that controls a network scanner via eSCL, processes scans through an automated pipeline, and outputs professionally named documents. 802 tests, 94% coverage, all three phases complete.
 
 **Three interfaces, one backend:**
-- **REST API** (`/api/*`) — primary interface with OpenAPI docs at `/api/docs`
-- **MCP Server** (`/mcp`) — 20 tools for AI agent integration, enabled via `MCP_ENABLED=true`
+- **REST API** (`/api/*`) — 65+ endpoints with OpenAPI docs at `/api/docs`
+- **MCP Server** (`/mcp`) — 27 tools for AI agent integration, enabled via `MCP_ENABLED=true`
 - **Web UI** (`/`) — htmx + Alpine.js wizard-guided workflow
 
 ## Source Layout
@@ -29,12 +29,14 @@ scanbox/
 │   ├── splitter.py        # AI document splitting via litellm
 │   ├── namer.py           # Professional filename generation
 │   ├── output.py          # PDF splitting, metadata, Index.csv
-│   └── runner.py          # Pipeline orchestration with checkpointing
+│   ├── runner.py          # Stage-aware pipeline with pause/resume/DLQ
+│   └── state.py           # PipelineState, StageState, DLQItem, PipelineConfig
 ├── api/
 │   ├── persons.py         # CRUD for people
 │   ├── sessions.py        # Session management
-│   ├── scanning.py        # Background scan tasks (fronts, backs, processing)
-│   ├── batches.py         # Batch status, reprocess, page thumbnails
+│   ├── scanning.py        # Background scan tasks, PDF import endpoint
+│   ├── import_batch.py    # Shared import_batch() for API + test fixtures
+│   ├── batches.py         # Batch status, pipeline control, DLQ, exclusions
 │   ├── documents.py       # Document CRUD, PDF/thumbnail/text serving
 │   ├── boundaries.py      # Document boundary editor
 │   ├── setup.py           # First-run wizard (test scanner/LLM/Paperless)
@@ -43,10 +45,10 @@ scanbox/
 │   ├── sse.py             # EventBus for SSE progress streaming
 │   ├── paperless.py       # PaperlessNGX client
 │   ├── webhooks.py        # Webhook registration and dispatch
-│   └── views.py           # HTML template routes
+│   └── views.py           # HTML template routes + pipeline page
 ├── mcp/
-│   └── server.py          # 17 MCP tools, 2 resources, 2 prompts
-└── templates/             # Jinja2 + jinja2-fragments
+│   └── server.py          # 27 MCP tools, 4 resources, 4 prompts
+└── templates/             # Jinja2 + jinja2-fragments (incl. pipeline.html)
 ```
 
 ## Commands
@@ -59,7 +61,7 @@ bash .githooks/setup.sh
 python -m tests.generate_fixtures
 
 # Test
-pytest                          # all 532 tests
+pytest                          # all 802 tests
 pytest tests/unit/ -v           # unit tests only
 pytest tests/integration/ -v    # integration tests
 pytest -k "pattern"             # filter
@@ -76,7 +78,7 @@ ruff check scanbox/ tests/      # line-length=100
 docker compose up               # http://localhost:8090
 
 # System deps (macOS)
-brew install tesseract poppler ghostscript
+brew install tesseract poppler ghostscript ocrmypdf
 ```
 
 ## Principles
@@ -119,9 +121,13 @@ Four layers, innermost to outermost:
 ## Key Technical Details
 
 ### Pipeline
-- **Checkpointing:** Each stage writes to disk before the next begins. `state.json` tracks progress per batch. Pipeline resumes from last checkpoint on crash.
-- **Batch states:** `scanning_fronts → fronts_done → scanning_backs → backs_done → processing → review → saved`
-- **AI splitting:** One litellm call per batch (all pages). Response validated for contiguous, non-overlapping, full-coverage page ranges.
+- **Stage-aware execution:** Pipeline runs 5 stages (interleave → blank removal → OCR → splitting → naming). Each stage checkpoints to `state.json` with status, timestamps, and results. `PipelineState` class in `scanbox/pipeline/state.py` manages all transitions.
+- **Pause/resume:** Auto-advances on success. Pauses on stage errors or low-confidence splits. Batch goes to `PAUSED` state. User can resume, retry, skip, or advance via API.
+- **DLQ (Dead Letter Queue):** Configurable `PIPELINE_AUTO_ADVANCE_ON_ERROR=true` skips problems and queues them. DLQ items stored in `state.json`, manageable via API.
+- **Batch states:** `scanning_fronts → fronts_done → scanning_backs → backs_done → processing → [paused] → review → saved`
+- **AI splitting:** One litellm call per batch (all pages, `max_tokens=4096`). Response validated for contiguous, non-overlapping, full-coverage page ranges. Missing `end_page` defaults to `start_page`.
+- **Pipeline control API:** `GET /api/batches/{id}/pipeline` for full state. `POST .../resume`, `.../retry`, `.../skip`, `.../advance` for control. DLQ endpoints for item management.
+- **Page/document exclusion:** `POST/DELETE /api/batches/{id}/exclude/page/{num}` and `.../document/{idx}`. Exclusions persist in `state.json`.
 
 ### eSCL Protocol
 - Endpoints at `http://{ip}/eSCL/...` (capital S, C, L)
@@ -143,6 +149,14 @@ Four layers, innermost to outermost:
 - `litellm==1.82.6` — exact pin due to supply chain incident on 1.82.7/1.82.8
 - `pikepdf` — use `allow_overwriting_input=True` when saving to same path
 - `ocrmypdf` — requires tesseract, ghostscript (since v17), poppler as system packages
+
+### Test Fixture Framework
+- **Medical document generator:** `tests/medical_documents/` — composable framework for generating test PDFs. 11 document types, 8 artifact types (duplicates, shuffled pages, wrong patient, etc.), configurable patient context.
+- **Test suite:** 13 pre-committed piles in `tests/fixtures/test_suite/` covering all pipeline scenarios (standard, single-sided, chaos, stress test, etc.).
+- **PDF import:** `POST /api/batches/import` injects PDFs into the pipeline without a scanner. `load_test_pile` pytest fixture loads test piles by name.
+- **Stage fixtures:** `interleaved_batch`, `blanks_removed_batch`, `ocr_complete_batch` — pre-processed batches for testing individual stages.
+- **Commands:** `/test-pdfs` for generating/verifying fixtures. `python -m tests.generate_test_suite` for regeneration.
+- **E2E tests:** `tests/integration/test_e2e_pipeline.py` runs real pipeline stages against fixture PDFs. LLM tests use local MLX-LM when available, skip gracefully when not.
 
 ## Mocking Patterns
 
@@ -172,6 +186,13 @@ pdf.add_blank_page(page_size=(612, 792))
 pdf.save(buf)
 ```
 
+### Pipeline return type
+`run_pipeline()` returns `PipelineResult` (not `list[SplitDocument]`). Access documents via `result.documents`. When mocking in tests:
+```python
+from scanbox.models import PipelineResult
+mock_pipeline.return_value = PipelineResult(status="completed", documents=[...])
+```
+
 ### JSON key types
 `text_by_page.json` uses string keys (`"1"`, `"2"`) since JSON doesn't support integer keys. Access as `text_data["1"]`, not `text_data[1]`.
 
@@ -181,9 +202,10 @@ pdf.save(buf)
 |----------|---------|
 | `docs/design.md` | **Single source of truth** — behavior, architecture, error handling |
 | `docs/api-spec.md` | REST API reference — all endpoints with examples |
-| `docs/mcp-server.md` | MCP server — 20 tools, 2 resources, 4 prompts |
+| `docs/mcp-server.md` | MCP server — 27 tools, 4 resources, 4 prompts |
 | `docs/ui-spec.md` | Visual design — components, layouts, accessibility |
-| `docs/plans/2026-03-28-scanbox-implementation.md` | Original implementation plan (all tasks complete) |
+| `docs/superpowers/specs/` | Design specs for pipeline control, test import, medical doc generator |
+| `docs/superpowers/plans/` | Implementation plans for each subsystem |
 
 ## CI/CD
 
