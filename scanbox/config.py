@@ -25,12 +25,24 @@ class Config:
         # Scanner — runtime config takes priority over env var
         self.SCANNER_IP: str = runtime.get("scanner_ip") or os.getenv("SCANNER_IP", "")
 
-        # LLM
-        self.LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "anthropic")
-        self.LLM_MODEL: str = os.getenv("LLM_MODEL", "")
-        self.ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-        self.OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-        self.OLLAMA_URL: str = os.getenv("OLLAMA_URL", "http://localhost:11434")
+        # LLM — runtime config takes priority over env var
+        self.LLM_PROVIDER: str = runtime.get("llm_provider") or os.getenv(
+            "LLM_PROVIDER", "anthropic"
+        )
+        self.LLM_MODEL: str = runtime.get("llm_model") or os.getenv("LLM_MODEL", "")
+        self.ANTHROPIC_API_KEY: str = (
+            runtime.get("llm_api_key")
+            if self.LLM_PROVIDER == "anthropic"
+            else os.getenv("ANTHROPIC_API_KEY", "")
+        ) or os.getenv("ANTHROPIC_API_KEY", "")
+        self.OPENAI_API_KEY: str = (
+            runtime.get("llm_api_key")
+            if self.LLM_PROVIDER == "openai"
+            else os.getenv("OPENAI_API_KEY", "")
+        ) or os.getenv("OPENAI_API_KEY", "")
+        self.OLLAMA_URL: str = runtime.get("llm_url") or os.getenv(
+            "OLLAMA_URL", "http://localhost:11434"
+        )
 
         # PaperlessNGX (optional)
         self.PAPERLESS_URL: str = os.getenv("PAPERLESS_URL", "")
