@@ -8,6 +8,7 @@ from scanbox.scanner.discovery import (
     DiscoveredScanner,
     _dedup_scanners,
     discover_scanners,
+    mdns_available,
 )
 
 
@@ -150,6 +151,43 @@ class TestDiscoveredScannerDedup:
         ]
         result = _dedup_scanners(scanners)
         assert len(result) == 2
+
+
+class TestMdnsAvailable:
+    def test_returns_true_on_lan_ip(self):
+        """LAN IP (e.g. host networking or bare metal) means mDNS works."""
+        mock_socket = MagicMock()
+        mock_socket.getsockname.return_value = ("192.168.1.100", 0)
+        with patch("scanbox.scanner.discovery.socket.socket", return_value=mock_socket):
+            assert mdns_available() is True
+
+    def test_returns_false_on_bridge_ip(self):
+        """Docker bridge IP (172.17.x.x) means mDNS won't work."""
+        mock_socket = MagicMock()
+        mock_socket.getsockname.return_value = ("172.17.0.2", 0)
+        with patch("scanbox.scanner.discovery.socket.socket", return_value=mock_socket):
+            assert mdns_available() is False
+
+    def test_returns_false_on_connect_failure(self):
+        """No route to multicast = no network = no mDNS."""
+        mock_socket = MagicMock()
+        mock_socket.connect.side_effect = OSError("Network unreachable")
+        with patch("scanbox.scanner.discovery.socket.socket", return_value=mock_socket):
+            assert mdns_available() is False
+
+    def test_returns_false_on_loopback(self):
+        """Loopback only means no LAN access."""
+        mock_socket = MagicMock()
+        mock_socket.getsockname.return_value = ("127.0.0.1", 0)
+        with patch("scanbox.scanner.discovery.socket.socket", return_value=mock_socket):
+            assert mdns_available() is False
+
+    def test_returns_true_on_non_bridge_private_ip(self):
+        """10.x.x.x network (non-bridge private) means mDNS works."""
+        mock_socket = MagicMock()
+        mock_socket.getsockname.return_value = ("10.0.0.50", 0)
+        with patch("scanbox.scanner.discovery.socket.socket", return_value=mock_socket):
+            assert mdns_available() is True
 
 
 class TestDiscoverScanners:

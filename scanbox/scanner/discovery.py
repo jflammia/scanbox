@@ -44,31 +44,28 @@ _BRIDGE_PREFIXES = (
 def mdns_available() -> bool:
     """Check if mDNS discovery is likely to work.
 
-    Returns False if the only non-loopback IPs are on Docker bridge subnets
-    (172.17-31.x.x), which means we're in a container without host networking
-    and mDNS multicast won't reach the LAN.
+    Uses a UDP connect to the mDNS multicast address (224.0.0.251:5353) to ask
+    the OS which interface it would use for mDNS traffic.  This is reliable
+    regardless of hostname resolution — the previous getaddrinfo approach failed
+    on Linux servers where the hostname only resolves to 127.0.1.1 in /etc/hosts.
 
-    Returns True on host networking, macvlan, or bare metal (any non-bridge
-    LAN IP found).
+    Returns False if the outgoing IP is loopback or on a Docker bridge subnet
+    (172.17-31.x.x), meaning we're in a container without host networking.
     """
     try:
-        addrs = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
-        ips = {info[4][0] for info in addrs}
-    except socket.gaierror:
-        ips = set()
-
-    # Filter out loopback
-    non_loopback = {ip for ip in ips if not ip.startswith("127.")}
-
-    if not non_loopback:
-        # No network interfaces at all — can't do mDNS
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("224.0.0.251", 5353))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+    except OSError:
         return False
 
-    # If every non-loopback IP is on a Docker bridge subnet, mDNS won't work
-    all_bridge = all(
-        any(ip.startswith(prefix) for prefix in _BRIDGE_PREFIXES) for ip in non_loopback
-    )
-    return not all_bridge
+    if ip.startswith("127."):
+        return False
+
+    return not any(ip.startswith(prefix) for prefix in _BRIDGE_PREFIXES)
 
 
 @dataclass

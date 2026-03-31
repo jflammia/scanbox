@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from scanbox.config import Config
 from scanbox.database import Database
+from scanbox.scanner.monitor import scanner_monitor
 
 _db: Database | None = None
 
@@ -34,7 +35,13 @@ async def lifespan(app: FastAPI):
 
         app.mount("/mcp", mcp_server.streamable_http_app())
 
+    # Start scanner monitoring
+    if cfg.SCANNER_IP:
+        await scanner_monitor.start(cfg.SCANNER_IP)
+
     yield
+
+    await scanner_monitor.stop()
     await _db.close()
     _db = None
 
