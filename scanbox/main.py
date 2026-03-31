@@ -121,13 +121,17 @@ async def health():
     }
 
     # LLM
-    checks["llm"] = {
+    llm_info: dict = {
         "provider": cfg.LLM_PROVIDER,
         "model": cfg.llm_model_id(),
         "configured": bool(
             cfg.ANTHROPIC_API_KEY or cfg.OPENAI_API_KEY or cfg.LLM_PROVIDER == "ollama"
         ),
     }
+    api_base = cfg.llm_api_base()
+    if api_base:
+        llm_info["api_base"] = api_base
+    checks["llm"] = llm_info
 
     # PaperlessNGX
     if cfg.PAPERLESS_URL:
