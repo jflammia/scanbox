@@ -349,10 +349,16 @@ async def test_llm():
     try:
         import litellm
 
+        kwargs = {}
+        api_base = cfg.llm_api_base()
+        if api_base:
+            kwargs["api_base"] = api_base
+
         await litellm.acompletion(
             model=model,
             messages=[{"role": "user", "content": "Reply with OK"}],
             max_tokens=5,
+            **kwargs,
         )
         return {
             "success": True,
