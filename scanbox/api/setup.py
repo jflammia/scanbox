@@ -92,7 +92,9 @@ async def setup_discover_scanners():
         cards = ""
         for s in scanners:
             icon_html = (
-                f'<img src="{s.icon_url}" alt="" class="w-10 h-10 object-cover rounded">'
+                f'<img src="/api/scanner/icon?ip={s.ip}" alt="" '
+                f'class="w-10 h-10 object-cover rounded"'
+                f" onerror=\"this.parentElement.innerHTML='&#128424;'\">"
                 if s.icon_url
                 else '<div class="text-3xl">&#128424;</div>'
             )

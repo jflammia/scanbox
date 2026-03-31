@@ -460,7 +460,7 @@ async def scanner_status_card():
         adf_text = "Paper loaded" if status.adf_loaded else "Empty"
         return HTMLResponse(
             '<div class="flex items-center gap-4">'
-            '<img src="/api/scanner/icon" alt="" class="w-16 h-16 object-contain rounded"'
+            '<img src="/api/scanner/icon" alt="" class="w-10 h-10 object-contain rounded"'
             " onerror=\"this.style.display='none'\">"
             "<div>"
             '<div class="flex items-center gap-2">'
@@ -559,12 +559,9 @@ async def discover_scanners_html():
     cards = ""
     for s in scanners:
         if s.icon_url:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(s.icon_url)
-            icon_direct = f"http://{s.ip}{parsed.path}"
             icon_html = (
-                f'<img src="{icon_direct}" alt="" class="w-12 h-12 object-contain rounded"'
+                f'<img src="/api/scanner/icon?ip={s.ip}" alt="" '
+                f'class="w-12 h-12 object-contain rounded"'
                 f" onerror=\"this.parentElement.innerHTML='&#128424;'\">"
             )
         else:

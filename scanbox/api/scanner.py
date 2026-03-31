@@ -72,13 +72,17 @@ async def scanner_capabilities():
 
 
 @router.get("/api/scanner/icon")
-async def scanner_icon():
-    """Proxy the scanner's icon image."""
-    cfg = Config()
-    if not cfg.SCANNER_IP:
+async def scanner_icon(ip: str | None = Query(default=None)):
+    """Proxy the scanner's icon image.
+
+    When ``ip`` is provided, fetches the icon from that scanner directly
+    (used for discovery results).  Otherwise uses the configured scanner.
+    """
+    scanner_ip = ip or Config().SCANNER_IP
+    if not scanner_ip:
         raise HTTPException(status_code=404, detail="No scanner configured")
 
-    client = ESCLClient(cfg.SCANNER_IP)
+    client = ESCLClient(scanner_ip)
     try:
         caps = await client.get_capabilities()
         if not caps.icon_url:
@@ -86,7 +90,7 @@ async def scanner_icon():
 
         parsed = urlparse(caps.icon_url)
         icon_path = parsed.path  # e.g., /ipp/images/printer.png
-        icon_url = f"http://{cfg.SCANNER_IP}{icon_path}"
+        icon_url = f"http://{scanner_ip}{icon_path}"
 
         async with httpx.AsyncClient(timeout=5.0) as http:
             resp = await http.get(icon_url)
