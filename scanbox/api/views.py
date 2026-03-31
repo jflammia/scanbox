@@ -404,6 +404,9 @@ async def settings(request: Request):
             "scanner_ip": cfg.SCANNER_IP,
             "paperless_url": cfg.PAPERLESS_URL,
             "app_version": cfg.APP_VERSION,
+            "llm_provider": cfg.LLM_PROVIDER,
+            "llm_model": cfg.llm_model_id(),
+            "llm_url": cfg.OLLAMA_URL if cfg.LLM_PROVIDER == "ollama" else "",
         },
     )
 
@@ -425,6 +428,58 @@ async def settings_scanner(scanner_ip: str = Form("")):
     if scanner_ip.strip():
         return HTMLResponse('<p class="text-status-success font-medium mt-2">Scanner IP saved.</p>')
     return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')
+
+
+@router.post("/settings/llm", response_class=HTMLResponse)
+async def settings_llm(
+    llm_provider: str = Form(""),
+    llm_model: str = Form(""),
+    llm_url: str = Form(""),
+    llm_api_key: str = Form(""),
+):
+    """Save LLM settings and test connectivity."""
+    cfg = Config()
+    runtime_path = cfg.config_dir / "runtime.json"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {}
+    if runtime_path.exists():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            data = json.loads(runtime_path.read_text())
+
+    data["llm_provider"] = llm_provider.strip()
+    data["llm_model"] = llm_model.strip()
+    if llm_provider == "ollama":
+        data["llm_url"] = llm_url.strip()
+    if llm_api_key.strip():
+        data["llm_api_key"] = llm_api_key.strip()
+    runtime_path.write_text(json.dumps(data))
+
+    # Test connectivity
+    import litellm
+
+    model = llm_model.strip() or Config().llm_model_id()
+    kwargs = {}
+    if llm_provider == "ollama" and llm_url.strip():
+        kwargs["api_base"] = llm_url.strip()
+
+    try:
+        await litellm.acompletion(
+            model=model,
+            messages=[{"role": "user", "content": "Reply with OK"}],
+            max_tokens=5,
+            **kwargs,
+        )
+        return HTMLResponse(
+            '<p class="text-status-success font-medium mt-2">'
+            f"Connected to {llm_provider} ({model})</p>"
+        )
+    except Exception as e:
+        msg = str(e).split("\n")[0][:200]
+        return HTMLResponse(
+            '<p class="text-status-error font-medium mt-2">'
+            f"Settings saved but connection failed: {msg}</p>"
+        )
 
 
 @router.get("/scanner")
