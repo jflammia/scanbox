@@ -65,6 +65,45 @@ async def scan_wizard(request: Request, session_id: str, batch_id: str):
     return templates.TemplateResponse(request, "scan.html", {"batch": batch, "session": session})
 
 
+@router.get("/batches/{batch_id}/scan-summary", response_class=HTMLResponse)
+async def scan_summary_html(request: Request, batch_id: str):
+    """HTML partial showing scan summary with thumbnail grid."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch_dir_path = None
+    session = await db.get_session(batch["session_id"])
+    if session:
+        cfg = Config()
+        batch_dir_path = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+    thumbnails = []
+    if batch_dir_path:
+        thumbs_dir = batch_dir_path / "thumbs"
+        if thumbs_dir.exists():
+            for thumb in sorted(thumbs_dir.glob("page-*.jpg")):
+                page_num = int(thumb.stem.split("-")[1])
+                thumbnails.append(
+                    {
+                        "page": page_num,
+                        "url": f"/api/batches/{batch_id}/thumbs/{page_num}",
+                    }
+                )
+
+    return templates.TemplateResponse(
+        request,
+        "scan_summary.html",
+        {
+            "batch": batch,
+            "thumbnails": thumbnails,
+        },
+    )
+
+
 # Stage labels for the pipeline page (plain English, keyed by ProcessingStage values)
 _PIPELINE_STAGE_LABELS: dict[str, str] = {
     "interleaving": "Combining front and back pages",
@@ -428,6 +467,46 @@ async def settings_scanner(scanner_ip: str = Form("")):
     if scanner_ip.strip():
         return HTMLResponse('<p class="text-status-success font-medium mt-2">Scanner IP saved.</p>')
     return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')
+
+
+@router.post("/settings/llm/check-url", response_class=HTMLResponse)
+async def settings_llm_check_url(llm_url: str = Form("")):
+    """Test Ollama URL connectivity and return a model selector if reachable."""
+    import httpx
+
+    url = llm_url.strip().rstrip("/")
+    if not url:
+        return HTMLResponse("")
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{url}/api/tags")
+            resp.raise_for_status()
+            models = resp.json().get("models", [])
+    except Exception:
+        return HTMLResponse(
+            '<p class="text-status-error text-sm mt-1">'
+            "Can't reach this server. Check the URL and try again.</p>"
+        )
+
+    if not models:
+        return HTMLResponse(
+            '<p class="text-status-warning text-sm mt-1">'
+            "Connected, but no models found. Pull a model first.</p>"
+        )
+
+    options = "".join(
+        f'<option value="ollama/{m["name"]}">  {m["name"]}  '
+        f"({m.get('size', 0) // 1_000_000_000}GB)</option>"
+        for m in models
+    )
+    return HTMLResponse(
+        '<p class="text-status-success text-sm mt-1 mb-2">Connected</p>'
+        '<label class="block text-sm font-medium text-text-secondary mb-1">Model</label>'
+        f'<select name="llm_model" class="w-full border border-border rounded-md px-4 '
+        f"py-2 text-base bg-surface-raised focus:outline-none focus:ring-2 "
+        f'focus:ring-brand-500">{options}</select>'
+    )
 
 
 @router.post("/settings/llm", response_class=HTMLResponse)
