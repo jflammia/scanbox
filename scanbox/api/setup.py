@@ -393,8 +393,11 @@ async def test_paperless():
 
 @router.get("/setup")
 async def setup_page(request: Request):
+    from scanbox.scanner.discovery import BRIDGE_NETWORK_HINT, mdns_available
+
     data = _read_setup()
     cfg = Config()
+    can_discover = mdns_available()
     return templates.TemplateResponse(
         request,
         "setup.html",
@@ -402,5 +405,7 @@ async def setup_page(request: Request):
             "current_step": data.get("current_step", 1),
             "total_steps": TOTAL_STEPS,
             "scanner_configured": bool(cfg.SCANNER_IP),
+            "mdns_available": can_discover,
+            "mdns_hint": None if can_discover else BRIDGE_NETWORK_HINT,
         },
     )

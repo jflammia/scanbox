@@ -17,6 +17,7 @@
   <div x-show="step === 1" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
     <div class="text-5xl">&#128424;</div>
     <h2 class="text-xl font-semibold">Find your scanner</h2>
+    {% if mdns_available %}
     <p class="text-text-secondary">Searching your network for scanners...</p>
 
     {# Discovery results — auto-triggered on load #}
@@ -42,6 +43,12 @@
         <span class="inline-block w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></span>
       </span>
     </button>
+    {% else %}
+    <div class="bg-status-warning/10 border border-status-warning/30 rounded-lg p-3 text-left">
+      <p class="font-medium text-status-warning text-sm">Automatic discovery unavailable</p>
+      <p class="text-xs text-text-secondary mt-1">{{ mdns_hint }}</p>
+    </div>
+    {% endif %}
 
     {# Manual entry + verify form #}
     <form x-ref="verifyForm"
@@ -50,7 +57,7 @@
           hx-swap="innerHTML"
           hx-indicator="#setup-verify-spinner"
           class="space-y-3">
-      <label class="block text-sm text-text-secondary text-left">Or enter an IP address</label>
+      <label class="block text-sm text-text-secondary text-left">Enter your scanner's IP address</label>
       <div class="flex gap-2">
         <input type="text" name="scanner_ip" x-ref="scannerIp" placeholder="e.g. 192.168.1.100"
                class="flex-1 border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">

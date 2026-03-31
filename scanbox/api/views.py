@@ -419,8 +419,19 @@ async def settings_scanner(scanner_ip: str = Form("")):
 @router.get("/scanner")
 async def scanner_page(request: Request):
     """Dedicated scanner configuration page."""
+    from scanbox.scanner.discovery import BRIDGE_NETWORK_HINT, mdns_available
+
     cfg = Config()
-    return templates.TemplateResponse(request, "scanner.html", {"scanner_ip": cfg.SCANNER_IP})
+    can_discover = mdns_available()
+    return templates.TemplateResponse(
+        request,
+        "scanner.html",
+        {
+            "scanner_ip": cfg.SCANNER_IP,
+            "mdns_available": can_discover,
+            "mdns_hint": None if can_discover else BRIDGE_NETWORK_HINT,
+        },
+    )
 
 
 @router.get("/scanner/status-card", response_class=HTMLResponse)
@@ -519,7 +530,20 @@ async def set_scanner_ip(request: Request):
 @router.post("/scanner/discover", response_class=HTMLResponse)
 async def discover_scanners_html():
     """Discover scanners on the network and return HTML cards."""
-    from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
+    from scanbox.scanner.discovery import (
+        BRIDGE_NETWORK_HINT,
+        DISCOVERY_HINT,
+        discover_scanners,
+        mdns_available,
+    )
+
+    if not mdns_available():
+        return HTMLResponse(
+            '<div class="bg-status-warning/10 border border-status-warning/30 rounded-lg p-4">'
+            '<p class="font-medium text-status-warning">Scanner discovery unavailable</p>'
+            f'<p class="text-sm text-text-secondary mt-1">{BRIDGE_NETWORK_HINT}</p>'
+            "</div>"
+        )
 
     scanners = await discover_scanners(timeout=5.0)
     if not scanners:

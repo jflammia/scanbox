@@ -48,6 +48,7 @@
     {# mDNS discovery #}
     <div class="border-t border-border pt-6">
       <h3 class="text-lg font-medium mb-3">Or find scanners on your network</h3>
+      {% if mdns_available %}
       <button type="button"
               hx-post="/scanner/discover" hx-target="#discover-results" hx-swap="innerHTML"
               hx-indicator="#discover-spinner"
@@ -59,6 +60,12 @@
         Searching...
       </span>
       <div id="discover-results" class="mt-4"></div>
+      {% else %}
+      <div class="bg-status-warning/10 border border-status-warning/30 rounded-lg p-4">
+        <p class="font-medium text-status-warning">Scanner discovery unavailable</p>
+        <p class="text-sm text-text-secondary mt-1">{{ mdns_hint }}</p>
+      </div>
+      {% endif %}
     </div>
   </div>
 </section>
