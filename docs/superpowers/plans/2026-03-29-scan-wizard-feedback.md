@@ -1,6 +1,6 @@
 # Scan Wizard Real-Time Feedback Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the silent scan wizard with SSE-driven real-time progress showing page counts, pipeline stages, and clear error messages.
 
@@ -19,7 +19,7 @@
 - Modify: `scanbox/pipeline/runner.py:69-168` (run_pipeline stages)
 - Test: `tests/unit/test_scanning.py` (existing) and `tests/unit/test_runner.py` (if exists)
 
-- [ ] **Step 1: Add on_page callback to _acquire_pages**
+- [x] **Step 1: Add on_page callback to _acquire_pages**
 
 In `scanbox/api/scanning.py`, modify `_acquire_pages` to accept and call an `on_page` callback:
 
@@ -53,7 +53,7 @@ async def _acquire_pages(
     return len(pages)
 ```
 
-- [ ] **Step 2: Publish page_scanned events in scan_fronts_task and scan_backs_task**
+- [x] **Step 2: Publish page_scanned events in scan_fronts_task and scan_backs_task**
 
 In `scan_fronts_task`, pass an `on_page` callback:
 
@@ -68,7 +68,7 @@ In `scan_fronts_task`, pass an `on_page` callback:
 
 Same pattern in `scan_backs_task` with `"side": "backs"`.
 
-- [ ] **Step 3: Add stage_complete events in _run_processing**
+- [x] **Step 3: Add stage_complete events in _run_processing**
 
 In `_run_processing`, add a second callback that fires after each stage completes. Add `stage_complete` events after each stage in `run_pipeline`.
 
@@ -130,7 +130,7 @@ And in `_run_processing` in scanning.py, update the `on_progress` callback:
             )
 ```
 
-- [ ] **Step 4: Add stage_done calls after each pipeline stage**
+- [x] **Step 4: Add stage_done calls after each pipeline stage**
 
 In `scanbox/pipeline/runner.py`, add `stage_done` calls:
 
@@ -164,12 +164,12 @@ After naming (after line 168):
         await stage_done(ProcessingStage.NAMING, "All documents named")
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `. .venv/bin/activate && python -m pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 Expected: All pass (the callback changes are backward-compatible since `complete` defaults to False)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/api/scanning.py scanbox/pipeline/runner.py
@@ -183,7 +183,7 @@ git commit -m "feat: add per-page scan events and stage completion events"
 **Files:**
 - Modify: `scanbox/api/views.py`
 
-- [ ] **Step 1: Add the SSE progress endpoint**
+- [x] **Step 1: Add the SSE progress endpoint**
 
 In `scanbox/api/views.py`, add a new endpoint that subscribes to the event bus and streams HTML fragments:
 
@@ -298,7 +298,7 @@ def _friendly_error(msg: str) -> str:
     return msg
 ```
 
-- [ ] **Step 2: Update scan-fronts to return SSE connection**
+- [x] **Step 2: Update scan-fronts to return SSE connection**
 
 Replace the `scan_fronts_html` response. Instead of returning a polling div, return the SSE connection:
 
@@ -310,7 +310,7 @@ Replace the `scan_fronts_html` response. Instead of returning a polling div, ret
     )
 ```
 
-- [ ] **Step 3: Update scan-backs to return SSE connection**
+- [x] **Step 3: Update scan-backs to return SSE connection**
 
 Same pattern for `scan_backs_html`:
 
@@ -322,11 +322,11 @@ Same pattern for `scan_backs_html`:
     )
 ```
 
-- [ ] **Step 4: Remove the old polling endpoints**
+- [x] **Step 4: Remove the old polling endpoints**
 
 Delete `scan_status_html` and `scan_back_status_html` — they're replaced by SSE.
 
-- [ ] **Step 5: Add w-4 and h-4 CSS classes if missing**
+- [x] **Step 5: Add w-4 and h-4 CSS classes if missing**
 
 Check `static/css/app.css` for `.w-4` and `.h-4`. If missing, add:
 
@@ -337,13 +337,13 @@ Check `static/css/app.css` for `.w-4` and `.h-4`. If missing, add:
 
 Also add `.inline-block` for the spinner (should already exist).
 
-- [ ] **Step 6: Run tests, fix broken ones**
+- [x] **Step 6: Run tests, fix broken ones**
 
 Run: `. .venv/bin/activate && python -m pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 
 Tests referencing the old polling endpoints (`scan-status`, `scan-back-status`) or `hx-trigger="every 2s"` need updating. Update assertions to check for `sse-connect` instead.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scanbox/api/views.py static/css/app.css tests/
@@ -357,7 +357,7 @@ git commit -m "feat: add SSE HTML progress endpoint, replace polling"
 **Files:**
 - Modify: `scanbox/templates/scan.html`
 
-- [ ] **Step 1: Update scan.html**
+- [x] **Step 1: Update scan.html**
 
 The key changes:
 1. Scan buttons target a shared progress area that connects to SSE
@@ -395,13 +395,13 @@ Update Step 3 to show a simpler waiting message — the actual progress comes fr
   </section>
 ```
 
-- [ ] **Step 2: Run template tests**
+- [x] **Step 2: Run template tests**
 
 Run: `. .venv/bin/activate && python -m pytest tests/e2e/test_ui_comprehensive.py::TestScanPage -v`
 
 Update assertions for `hx-disabled-elt` and removal of `hx-trigger="every 2s"`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scanbox/templates/scan.html tests/
@@ -412,32 +412,32 @@ git commit -m "feat: rewrite scan template with SSE progress"
 
 ### Task 4: Test, rebuild, verify
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 ```bash
 . .venv/bin/activate && python -m pytest tests/ --ignore=tests/unit/test_fixtures.py -q
 ```
 
-- [ ] **Step 2: Lint**
+- [x] **Step 2: Lint**
 
 ```bash
 ruff format scanbox/ tests/
 ruff check scanbox/ tests/
 ```
 
-- [ ] **Step 3: Commit any fixes**
+- [x] **Step 3: Commit any fixes**
 
 ```bash
 git add -A && git commit -m "chore: fix lint and test issues"
 ```
 
-- [ ] **Step 4: Rebuild Docker container**
+- [x] **Step 4: Rebuild Docker container**
 
 ```bash
 podman compose down && podman compose up -d --build
 ```
 
-- [ ] **Step 5: Verify in browser**
+- [x] **Step 5: Verify in browser**
 
 Navigate to http://localhost:8090, start a scan, and confirm:
 - Page-by-page progress appears during scanning
@@ -445,7 +445,7 @@ Navigate to http://localhost:8090, start a scan, and confirm:
 - Error messages are clear and actionable
 - "Review Documents" link appears on completion
 
-- [ ] **Step 6: Push and create PR**
+- [x] **Step 6: Push and create PR**
 
 ```bash
 git push -u origin <branch>

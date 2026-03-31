@@ -1,6 +1,6 @@
 # Medical Document Generator Framework — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Refactor the monolithic `tests/generate_medical_pile.py` into a composable framework with a document registry, configurable pile assembly, artifact injection, manifest output, and Claude Code discoverability.
 
@@ -57,7 +57,7 @@
 **Files:**
 - Modify: `pyproject.toml:30-36`
 
-- [ ] **Step 1: Add fpdf2 to pyproject.toml dev deps**
+- [x] **Step 1: Add fpdf2 to pyproject.toml dev deps**
 
 ```python
 # In pyproject.toml [project.optional-dependencies], add fpdf2:
@@ -71,12 +71,12 @@ dev = [
 ]
 ```
 
-- [ ] **Step 2: Verify install**
+- [x] **Step 2: Verify install**
 
 Run: `uv pip install -e ".[dev]" 2>&1 | tail -3`
 Expected: fpdf2 installed successfully (already present from earlier manual install)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add pyproject.toml
@@ -91,7 +91,7 @@ git commit -m "chore: add fpdf2 to dev dependencies for test PDF generation"
 - Create: `tests/medical_documents/__init__.py` (empty placeholder)
 - Create: `tests/medical_documents/helpers.py`
 
-- [ ] **Step 1: Create package directory and empty init**
+- [x] **Step 1: Create package directory and empty init**
 
 ```bash
 mkdir -p tests/medical_documents/documents
@@ -102,7 +102,7 @@ Create `tests/medical_documents/__init__.py`:
 """Medical document generator framework for test fixture generation."""
 ```
 
-- [ ] **Step 2: Create helpers.py with all layout utilities**
+- [x] **Step 2: Create helpers.py with all layout utilities**
 
 Create `tests/medical_documents/helpers.py` by extracting lines 1-106 from `tests/generate_medical_pile.py`. These are the PDF helper functions that all document generators depend on.
 
@@ -183,12 +183,12 @@ def page_footer_text(pdf: FPDF, text: str, font: str = "Helvetica", size: int = 
     pdf.set_auto_page_break(auto=True, margin=20)
 ```
 
-- [ ] **Step 3: Verify helpers import cleanly**
+- [x] **Step 3: Verify helpers import cleanly**
 
 Run: `.venv/bin/python -c "from tests.medical_documents.helpers import new_pdf, heading, body; print('OK')"`
 Expected: `OK`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/medical_documents/__init__.py tests/medical_documents/helpers.py
@@ -203,7 +203,7 @@ git commit -m "refactor: extract PDF helpers into medical_documents.helpers"
 - Modify: `tests/medical_documents/__init__.py`
 - Create: `tests/medical_documents/assembler.py`
 
-- [ ] **Step 1: Write tests for core types**
+- [x] **Step 1: Write tests for core types**
 
 Create `tests/unit/test_medical_doc_types.py`:
 
@@ -295,12 +295,12 @@ class TestArtifacts:
             assert isinstance(a, PileArtifact)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_medical_doc_types.py -v 2>&1 | tail -5`
 Expected: FAIL — `ImportError` because types don't exist yet
 
-- [ ] **Step 3: Define PatientContext, DocumentDef, DocumentEntry, PileConfig in __init__.py**
+- [x] **Step 3: Define PatientContext, DocumentDef, DocumentEntry, PileConfig in __init__.py**
 
 Update `tests/medical_documents/__init__.py`:
 
@@ -362,7 +362,7 @@ class PileConfig:
     output_dir: Path = Path("tests/fixtures/medical_pile")
 ```
 
-- [ ] **Step 4: Create assembler.py with artifact types**
+- [x] **Step 4: Create assembler.py with artifact types**
 
 Create `tests/medical_documents/assembler.py`:
 
@@ -449,12 +449,12 @@ class RotatedPage(PileArtifact):
     page: int  # 1-based
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_medical_doc_types.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/medical_documents/__init__.py tests/medical_documents/assembler.py tests/unit/test_medical_doc_types.py
@@ -468,7 +468,7 @@ git commit -m "feat: add core types for medical document generator framework"
 **Files:**
 - Create: `tests/medical_documents/documents/__init__.py`
 
-- [ ] **Step 1: Write test for registry**
+- [x] **Step 1: Write test for registry**
 
 Create `tests/unit/test_medical_doc_registry.py`:
 
@@ -497,7 +497,7 @@ class TestRegistry:
             assert callable(doc_def.render)
 ```
 
-- [ ] **Step 2: Create documents/__init__.py with auto-discovery**
+- [x] **Step 2: Create documents/__init__.py with auto-discovery**
 
 Create `tests/medical_documents/documents/__init__.py`:
 
@@ -527,12 +527,12 @@ def _discover_documents() -> None:
 _discover_documents()
 ```
 
-- [ ] **Step 3: Run tests to verify they pass**
+- [x] **Step 3: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_medical_doc_registry.py -v`
 Expected: All tests PASS (registry is empty but valid)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/medical_documents/documents/__init__.py tests/unit/test_medical_doc_registry.py
@@ -555,7 +555,7 @@ This is the largest task — extracting each `doc_*` function from the monolith 
 - Create: all 11 files under `tests/medical_documents/documents/`
 - Source: `tests/generate_medical_pile.py` lines 113-1693
 
-- [ ] **Step 1: Write test that all 11 documents register**
+- [x] **Step 1: Write test that all 11 documents register**
 
 Add to `tests/unit/test_medical_doc_registry.py`:
 
@@ -588,12 +588,12 @@ class TestAllDocumentsRegistered:
         assert len(REGISTRY) == 11
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/unit/test_medical_doc_registry.py::TestAllDocumentsRegistered -v`
 Expected: FAIL — documents not found in empty registry
 
-- [ ] **Step 3: Extract all 11 document modules**
+- [x] **Step 3: Extract all 11 document modules**
 
 For each document, extract from the monolith into its own file. The pattern for each file:
 
@@ -671,12 +671,12 @@ Key changes when extracting:
 
 For the `operative_report.py`, the `back_artifact` on the `DocumentDef` should remain `"blank"` (the default). The near-blank footer on the last sheet of odd-page-count documents is handled by the assembler, not the document definition. Add a comment in the module noting this.
 
-- [ ] **Step 4: Run registry tests to verify all 11 register**
+- [x] **Step 4: Run registry tests to verify all 11 register**
 
 Run: `pytest tests/unit/test_medical_doc_registry.py -v`
 Expected: All tests PASS, 11 documents registered
 
-- [ ] **Step 5: Write render smoke test for each document**
+- [x] **Step 5: Write render smoke test for each document**
 
 Add to `tests/unit/test_medical_doc_registry.py`:
 
@@ -720,12 +720,12 @@ class TestDocumentRendering:
             assert len(pdf.pages) >= 1, f"{name} failed with custom patient"
 ```
 
-- [ ] **Step 6: Run all tests**
+- [x] **Step 6: Run all tests**
 
 Run: `pytest tests/unit/test_medical_doc_registry.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add tests/medical_documents/documents/ tests/unit/test_medical_doc_registry.py
@@ -740,7 +740,7 @@ git commit -m "feat: extract 11 document generators into individual registry mod
 - Modify: `tests/medical_documents/assembler.py`
 - Modify: `tests/medical_documents/__init__.py`
 
-- [ ] **Step 1: Write tests for basic pile assembly (no artifacts)**
+- [x] **Step 1: Write tests for basic pile assembly (no artifacts)**
 
 Create `tests/unit/test_pile_assembler.py`:
 
@@ -874,12 +874,12 @@ class TestBasicAssembly:
         assert manifest["patient"]["mrn"] == "TEST-1"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_pile_assembler.py -v 2>&1 | tail -5`
 Expected: FAIL — `generate_pile` not yet implemented
 
-- [ ] **Step 3: Implement PileAssembler in assembler.py**
+- [x] **Step 3: Implement PileAssembler in assembler.py**
 
 Add to `tests/medical_documents/assembler.py` (after the artifact class definitions):
 
@@ -1113,7 +1113,7 @@ class PileAssembler:
         manifest_path.write_text(json.dumps(manifest, indent=2))
 ```
 
-- [ ] **Step 4: Add generate_pile to __init__.py**
+- [x] **Step 4: Add generate_pile to __init__.py**
 
 Append to `tests/medical_documents/__init__.py`:
 
@@ -1126,12 +1126,12 @@ def generate_pile(config: PileConfig) -> tuple[Path, Path]:
     return assembler.generate(config)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_pile_assembler.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/medical_documents/assembler.py tests/medical_documents/__init__.py tests/unit/test_pile_assembler.py
@@ -1145,7 +1145,7 @@ git commit -m "feat: implement PileAssembler with sheet building, front/back spl
 **Files:**
 - Modify: `tests/medical_documents/assembler.py`
 
-- [ ] **Step 1: Write tests for each artifact type**
+- [x] **Step 1: Write tests for each artifact type**
 
 Create `tests/unit/test_pile_artifacts.py`:
 
@@ -1270,12 +1270,12 @@ class TestWrongPatientDocument:
         assert manifest["artifacts_applied"][0]["patient"] == "Wrong Person"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_pile_artifacts.py -v 2>&1 | tail -5`
 Expected: FAIL — artifacts not yet applied
 
-- [ ] **Step 3: Implement artifact application in PileAssembler**
+- [x] **Step 3: Implement artifact application in PileAssembler**
 
 Add method `_apply_artifacts` to `PileAssembler` in `assembler.py`, and call it from `generate()` where the TODO comment is. Replace the `# TODO: Apply artifacts here (Task 7)` line with `sheets, artifact_log = self._apply_artifacts(config, sheets, doc_pdfs, doc_metas)`. Then pass `artifact_log` to `_write_manifest`.
 
@@ -1325,16 +1325,16 @@ Implement each `_apply_*` method. Key implementations:
 
 Each method returns `(modified_sheets, log_entry_dict)`.
 
-- [ ] **Step 4: Update _write_manifest to accept artifact_log**
+- [x] **Step 4: Update _write_manifest to accept artifact_log**
 
 Change `_write_manifest` signature to accept `artifact_log` and write it into `manifest["artifacts_applied"]`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_pile_artifacts.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/medical_documents/assembler.py tests/unit/test_pile_artifacts.py
@@ -1348,7 +1348,7 @@ git commit -m "feat: implement pile artifact application (duplicates, shuffle, i
 **Files:**
 - Modify: `tests/medical_documents/__init__.py`
 
-- [ ] **Step 1: Write tests for discoverability functions**
+- [x] **Step 1: Write tests for discoverability functions**
 
 Create `tests/unit/test_medical_doc_discovery.py`:
 
@@ -1405,12 +1405,12 @@ class TestListArtifacts:
         assert "fields" in entry
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_medical_doc_discovery.py -v 2>&1 | tail -5`
 Expected: FAIL — functions not yet defined
 
-- [ ] **Step 3: Implement list_documents, describe_document, list_artifacts**
+- [x] **Step 3: Implement list_documents, describe_document, list_artifacts**
 
 Add to `tests/medical_documents/__init__.py`:
 
@@ -1488,12 +1488,12 @@ def list_artifacts() -> list[dict]:
     return sorted(result, key=lambda x: x["name"])
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_medical_doc_discovery.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/medical_documents/__init__.py tests/unit/test_medical_doc_discovery.py
@@ -1507,7 +1507,7 @@ git commit -m "feat: add discoverability API (list_documents, describe_document,
 **Files:**
 - Modify: `tests/generate_medical_pile.py`
 
-- [ ] **Step 1: Replace the monolith**
+- [x] **Step 1: Replace the monolith**
 
 Overwrite `tests/generate_medical_pile.py` with the thin CLI:
 
@@ -1615,7 +1615,7 @@ if __name__ == "__main__":
     print(f"\nOutput: {fronts.parent}/")
 ```
 
-- [ ] **Step 2: Run the standard recipe and verify output matches original**
+- [x] **Step 2: Run the standard recipe and verify output matches original**
 
 Run: `.venv/bin/python -m tests.generate_medical_pile standard`
 Expected: 13 sheets, fronts.pdf + backs.pdf + manifest.json
@@ -1632,12 +1632,12 @@ print('Page counts match: 13 fronts, 13 backs')
 "
 ```
 
-- [ ] **Step 3: Run all tests to verify nothing broke**
+- [x] **Step 3: Run all tests to verify nothing broke**
 
 Run: `pytest tests/unit/test_medical_doc_types.py tests/unit/test_medical_doc_registry.py tests/unit/test_pile_assembler.py tests/unit/test_pile_artifacts.py tests/unit/test_medical_doc_discovery.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tests/generate_medical_pile.py
@@ -1651,7 +1651,7 @@ git commit -m "refactor: replace monolith with thin CLI using medical_documents 
 **Files:**
 - Create: `.claude/rules/medical-document-generator.md`
 
-- [ ] **Step 1: Create the rule file**
+- [x] **Step 1: Create the rule file**
 
 Create `.claude/rules/medical-document-generator.md`:
 
@@ -1724,7 +1724,7 @@ Output: `tests/fixtures/medical_pile/` (fronts.pdf, backs.pdf, manifest.json)
 | `RotatedPage(doc_index, page)` | Page fed upside-down (180 degrees) |
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .claude/rules/medical-document-generator.md
@@ -1735,21 +1735,21 @@ git commit -m "docs: add Claude Code rule for medical document generator framewo
 
 ## Task 11: Final verification — run full test suite + format
 
-- [ ] **Step 1: Format all new code**
+- [x] **Step 1: Format all new code**
 
 Run: `ruff format tests/medical_documents/ tests/unit/test_medical_doc*.py tests/unit/test_pile*.py tests/generate_medical_pile.py`
 
-- [ ] **Step 2: Lint all new code**
+- [x] **Step 2: Lint all new code**
 
 Run: `ruff check tests/medical_documents/ tests/unit/test_medical_doc*.py tests/unit/test_pile*.py tests/generate_medical_pile.py`
 Expected: No errors
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `pytest -v`
 Expected: All tests pass (existing 532 + new tests)
 
-- [ ] **Step 4: Generate standard pile and verify output**
+- [x] **Step 4: Generate standard pile and verify output**
 
 Run: `.venv/bin/python -m tests.generate_medical_pile standard`
 
@@ -1770,7 +1770,7 @@ print('All checks passed')
 "
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

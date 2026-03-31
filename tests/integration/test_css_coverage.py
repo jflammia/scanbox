@@ -32,6 +32,7 @@ SKIP_TOKENS = {
     "!toast.type",
     "excluded",
     "!excluded",
+    "stage_key",
 }
 
 

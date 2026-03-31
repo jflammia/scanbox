@@ -18,110 +18,101 @@
     <h1 class="text-3xl font-bold">Processing{{ " for " + person.display_name if person else "" }}</h1>
     <p class="text-text-secondary mt-1">
       Batch {{ batch.batch_num }}
-      {% if pipeline_status == "completed" %}
-      &mdash; <span class="text-status-success font-medium">Complete</span>
-      {% elif pipeline_status == "paused" %}
-      &mdash; <span class="text-status-warning font-medium">Paused</span>
-      {% elif pipeline_status == "error" %}
-      &mdash; <span class="text-status-error font-medium">Error</span>
-      {% elif pipeline_status == "running" %}
-      &mdash; <span class="text-brand-600 font-medium">Running</span>
-      {% endif %}
+      <span x-show="status === 'completed'">&mdash; <span class="text-status-success font-medium">Complete</span></span>
+      <span x-show="status === 'paused'">&mdash; <span class="text-status-warning font-medium">Paused</span></span>
+      <span x-show="status === 'error'">&mdash; <span class="text-status-error font-medium">Error</span></span>
+      <span x-show="status === 'running'">&mdash; <span class="text-brand-600 font-medium">Running</span></span>
     </p>
   </div>
 
   {# Pipeline stages #}
   <div class="space-y-3" id="pipeline-stages" aria-live="polite">
     {% for stage_key, stage_label in stage_labels.items() %}
-    {% set stage = stages.get(stage_key, {}) %}
-    {% set status = stage.get("status", "pending") %}
     <div class="bg-surface-raised border border-border rounded-lg p-4"
          x-data="{ expanded: false }"
          id="stage-{{ stage_key }}">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          {# Status icon #}
-          {% if status == "completed" %}
-          <span class="text-status-success font-bold">&#10003;</span>
-          {% elif status == "running" %}
-          <div class="w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin inline-block"></div>
-          {% elif status == "paused" %}
-          <span class="text-status-warning font-bold">&#9888;</span>
-          {% elif status == "error" %}
-          <span class="text-status-error font-bold">&#10007;</span>
-          {% elif status == "skipped" %}
-          <span class="text-text-muted">&#8212;</span>
-          {% else %}
-          <span class="text-text-muted">&#9675;</span>
-          {% endif %}
+          {# Status icon — reactive via Alpine #}
+          <template x-if="stages['{{ stage_key }}'].status === 'completed'">
+            <span class="text-status-success font-bold">&#10003;</span>
+          </template>
+          <template x-if="stages['{{ stage_key }}'].status === 'running'">
+            <div class="w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin inline-block"></div>
+          </template>
+          <template x-if="stages['{{ stage_key }}'].status === 'paused'">
+            <span class="text-status-warning font-bold">&#9888;</span>
+          </template>
+          <template x-if="stages['{{ stage_key }}'].status === 'error'">
+            <span class="text-status-error font-bold">&#10007;</span>
+          </template>
+          <template x-if="stages['{{ stage_key }}'].status === 'skipped'">
+            <span class="text-text-muted">&#8212;</span>
+          </template>
+          <template x-if="stages['{{ stage_key }}'].status === 'pending'">
+            <span class="text-text-muted">&#9675;</span>
+          </template>
 
-          {# Label #}
-          {% if status == "skipped" %}
-          <span class="font-medium text-text-muted"><s>{{ stage_label }}</s></span>
-          {% elif status == "pending" %}
-          <span class="font-medium text-text-muted">{{ stage_label }}</span>
-          {% else %}
-          <span class="font-medium text-text-primary">{{ stage_label }}</span>
-          {% endif %}
+          {# Label — reactive styling #}
+          <span class="font-medium"
+                :class="{
+                  'text-text-muted': stages['{{ stage_key }}'].status === 'pending' || stages['{{ stage_key }}'].status === 'skipped',
+                  'text-text-primary': stages['{{ stage_key }}'].status !== 'pending' && stages['{{ stage_key }}'].status !== 'skipped'
+                }">
+            <template x-if="stages['{{ stage_key }}'].status === 'skipped'">
+              <s>{{ stage_label }}</s>
+            </template>
+            <template x-if="stages['{{ stage_key }}'].status !== 'skipped'">
+              <span>{{ stage_label }}</span>
+            </template>
+          </span>
         </div>
 
         {# Expand button for completed stages with results #}
-        {% if status == "completed" and stage.get("result") %}
-        <button @click="expanded = !expanded"
+        <button x-show="stages['{{ stage_key }}'].status === 'completed' && stages['{{ stage_key }}'].result"
+                @click="expanded = !expanded"
                 class="text-sm text-brand-600 hover:text-brand-700"
                 :aria-expanded="expanded">
           <span x-show="!expanded">Details</span>
           <span x-show="expanded">Hide</span>
         </button>
-        {% endif %}
       </div>
 
-      {# Result summary (inline for completed) #}
-      {% if status == "completed" and stage.get("result") %}
-      <p class="text-sm text-text-secondary mt-1 ml-2">
-        {% if stage_key == "interleaving" and stage.result.get("total_pages") %}
-        {{ stage.result.total_pages }} pages combined
-        {% elif stage_key == "blank_removal" and stage.result.get("removed_indices") is not none %}
-        {{ stage.result.kept_pages }} pages kept, {{ stage.result.removed_indices | length }} blank removed
-        {% elif stage_key == "ocr" %}
-        Text recognition complete
-        {% elif stage_key == "splitting" and stage.result.get("document_count") %}
-        {{ stage.result.document_count }} document{{ "s" if stage.result.document_count != 1 else "" }} found
-        {% elif stage_key == "naming" and stage.result.get("documents_named") %}
-        {{ stage.result.documents_named }} document{{ "s" if stage.result.documents_named != 1 else "" }} named
-        {% endif %}
-      </p>
-      {% endif %}
+      {# Result summary — reactive #}
+      <template x-if="stages['{{ stage_key }}'].status === 'completed' && stages['{{ stage_key }}'].result">
+        <p class="text-sm text-text-secondary mt-1 ml-2" x-text="stageSummary('{{ stage_key }}')"></p>
+      </template>
 
       {# Exclusion counts after blank_removal stage #}
-      {% if stage_key == "blank_removal" and status == "completed" %}
+      {% if stage_key == "blank_removal" %}
         {% if excluded_pages %}
-        <p class="text-sm text-text-secondary mt-2 ml-2">
+        <p class="text-sm text-text-secondary mt-2 ml-2"
+           x-show="stages['blank_removal'].status === 'completed'">
           {{ excluded_pages|length }} page{{ "s" if excluded_pages|length != 1 else "" }} excluded
         </p>
         {% endif %}
       {% endif %}
 
       {# Exclusion counts after splitting stage #}
-      {% if stage_key == "splitting" and status == "completed" %}
+      {% if stage_key == "splitting" %}
         {% if excluded_documents %}
-        <p class="text-sm text-text-secondary mt-2 ml-2">
+        <p class="text-sm text-text-secondary mt-2 ml-2"
+           x-show="stages['splitting'].status === 'completed'">
           {{ excluded_documents|length }} document{{ "s" if excluded_documents|length != 1 else "" }} excluded
         </p>
         {% endif %}
       {% endif %}
 
-      {# Expanded detail panel #}
-      {% if status == "completed" and stage.get("result") %}
-      <div x-show="expanded" x-transition class="mt-3 ml-2 text-sm text-text-secondary bg-gray-100 rounded p-3">
-        <code class="font-mono text-xs">{{ stage.result | tojson(indent=2) }}</code>
+      {# Expanded detail panel — reactive #}
+      <div x-show="expanded && stages['{{ stage_key }}'].status === 'completed' && stages['{{ stage_key }}'].result"
+           x-transition
+           class="mt-3 ml-2 text-sm text-text-secondary bg-gray-100 rounded p-3">
+        <code class="font-mono text-xs" x-text="JSON.stringify(stages['{{ stage_key }}'].result, null, 2)"></code>
       </div>
-      {% endif %}
 
-      {# Paused state: reason + control buttons #}
-      {% if status == "paused" %}
-      <div class="mt-3 ml-2 space-y-3">
-        <p class="text-sm text-status-warning">{{ stage.get("pause_reason", "Pipeline paused") }}</p>
+      {# Paused state: reason + control buttons — reactive #}
+      <div x-show="stages['{{ stage_key }}'].status === 'paused'" x-transition class="mt-3 ml-2 space-y-3">
+        <p class="text-sm text-status-warning" x-text="stages['{{ stage_key }}'].pause_reason || 'Pipeline paused'"></p>
         <div class="flex gap-2">
           <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
                   hx-post="/api/batches/{{ batch.id }}/pipeline/resume"
@@ -143,12 +134,10 @@
           </button>
         </div>
       </div>
-      {% endif %}
 
-      {# Error state: message + control buttons #}
-      {% if status == "error" %}
-      <div class="mt-3 ml-2 space-y-3">
-        <p class="text-sm text-status-error">{{ stage.get("error", "An unexpected error occurred") }}</p>
+      {# Error state: message + control buttons — reactive #}
+      <div x-show="stages['{{ stage_key }}'].status === 'error'" x-transition class="mt-3 ml-2 space-y-3">
+        <p class="text-sm text-status-error" x-text="stages['{{ stage_key }}'].error || 'An unexpected error occurred'"></p>
         <div class="flex gap-2">
           <button class="text-sm px-4 py-2 min-h-10 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700 transition-colors"
                   hx-post="/api/batches/{{ batch.id }}/pipeline/retry"
@@ -164,24 +153,20 @@
           </button>
         </div>
       </div>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
 
-  {# Link to results when complete #}
-  {% if pipeline_status == "completed" or batch.state == "review" %}
-  <div class="text-center pt-4">
+  {# Link to results when complete — reactive #}
+  <div x-show="status === 'completed'" x-transition class="text-center pt-4">
     <a href="/results/{{ batch.id }}"
        class="inline-block bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors no-underline">
       Review Documents
     </a>
   </div>
-  {% endif %}
 
-  {# DLQ Section #}
-  {% if dlq %}
-  <section class="space-y-3">
+  {# DLQ Section — reactive #}
+  <section x-show="dlq.length > 0" class="space-y-3">
     <h2 class="text-xl font-semibold">Items needing attention</h2>
     <p class="text-sm text-text-secondary">
       These items had issues during processing. You can edit, retry, or discard them.
@@ -304,12 +289,13 @@
       {% endfor %}
     </div>
   </section>
-  {% endif %}
 </section>
 
 <script>
 function pipelineView() {
   return {
+    stages: {{ stages_json|safe }},
+    dlq: {{ dlq_json|safe }},
     status: '{{ pipeline_status }}',
     batchId: '{{ batch.id }}',
     eventSource: null,
@@ -317,25 +303,112 @@ function pipelineView() {
     connectSSE() {
       // Only connect if pipeline is actively running
       if (this.status !== 'running') return;
-      this.eventSource = new EventSource('/batches/' + this.batchId + '/progress');
+
+      this.eventSource = new EventSource('/api/batches/' + this.batchId + '/progress/stream');
       this.eventSource.onmessage = (e) => {
-        // SSE delivers HTML fragments; append them to the stage area
-        var target = document.getElementById('pipeline-stages');
-        if (target && e.data) {
-          // When pipeline finishes, reload for final state
-          if (e.data.includes('All done') || e.data.includes('text-status-error')) {
-            setTimeout(function() { window.location.reload(); }, 1000);
-          }
+        try {
+          var event = JSON.parse(e.data);
+          this.handleEvent(event);
+        } catch (err) {
+          // Ignore malformed events
         }
       };
-      this.eventSource.onerror = function() {
-        // Connection closed means pipeline finished or errored
+      this.eventSource.onerror = () => {
         if (this.eventSource) {
           this.eventSource.close();
           this.eventSource = null;
-          setTimeout(function() { window.location.reload(); }, 2000);
         }
-      }.bind(this);
+      };
+    },
+
+    handleEvent(event) {
+      if (event.type === 'progress') {
+        if (event.stage && this.stages[event.stage]) {
+          this.stages[event.stage].status = 'running';
+        }
+      }
+
+      if (event.type === 'stage_complete') {
+        if (event.stage && this.stages[event.stage]) {
+          this.stages[event.stage].status = 'completed';
+          if (event.detail) {
+            this.stages[event.stage].detail = event.detail;
+          }
+        }
+      }
+
+      if (event.type === 'stage_result') {
+        if (event.stage && this.stages[event.stage]) {
+          this.stages[event.stage].result = event.result;
+        }
+      }
+
+      if (event.type === 'pipeline_paused') {
+        if (event.stage && this.stages[event.stage]) {
+          this.stages[event.stage].status = 'paused';
+          this.stages[event.stage].pause_reason = event.reason;
+        }
+        this.status = 'paused';
+      }
+
+      if (event.type === 'done') {
+        this.status = 'completed';
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
+      }
+
+      if (event.type === 'error') {
+        this.status = 'error';
+        // Mark the current running stage as errored
+        for (var key in this.stages) {
+          if (this.stages[key].status === 'running') {
+            this.stages[key].status = 'error';
+            this.stages[key].error = event.message || 'An unexpected error occurred';
+          }
+        }
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
+      }
+
+      if (event.type === 'dlq_item_added') {
+        this.dlq.push({
+          id: event.item_id,
+          stage: event.stage,
+          reason: event.reason,
+          added_at: new Date().toISOString(),
+          document: {}
+        });
+      }
+    },
+
+    stageSummary(stageKey) {
+      var result = this.stages[stageKey] && this.stages[stageKey].result;
+      if (!result) return '';
+
+      if (stageKey === 'interleaving' && result.total_pages) {
+        return result.total_pages + ' pages combined';
+      }
+      if (stageKey === 'blank_removal') {
+        var removed = result.removed_indices || [];
+        var kept = result.kept_pages || (result.total_pages || 0) - removed.length;
+        return kept + ' pages kept, ' + removed.length + ' blank removed';
+      }
+      if (stageKey === 'ocr') {
+        return 'Text recognition complete';
+      }
+      if (stageKey === 'splitting' && result.document_count !== undefined) {
+        var n = result.document_count;
+        return n + ' document' + (n !== 1 ? 's' : '') + ' found';
+      }
+      if (stageKey === 'naming' && result.documents_named !== undefined) {
+        var m = result.documents_named;
+        return m + ' document' + (m !== 1 ? 's' : '') + ' named';
+      }
+      return '';
     }
   };
 }

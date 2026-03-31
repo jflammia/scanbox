@@ -1,6 +1,6 @@
 # Stage-Aware Pipeline Control — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Refactor the pipeline runner to support stage-level pause/resume, document-level error isolation, a dead letter queue (DLQ) for deferred problem handling, and full observability at every step.
 
@@ -46,7 +46,7 @@
 
 This is the foundational data model that everything else builds on.
 
-- [ ] **Step 1: Write tests for PipelineState**
+- [x] **Step 1: Write tests for PipelineState**
 
 Create `tests/unit/test_pipeline_state.py`:
 
@@ -216,12 +216,12 @@ class TestOverallStatus:
         assert state.status == "error"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_pipeline_state.py -v 2>&1 | tail -5`
 Expected: FAIL — ImportError
 
-- [ ] **Step 3: Add PAUSED to BatchState and PipelineResult to models.py**
+- [x] **Step 3: Add PAUSED to BatchState and PipelineResult to models.py**
 
 In `scanbox/models.py`, add `PAUSED = "paused"` to `BatchState` enum (after `PROCESSING`). Add `PipelineResult`:
 
@@ -236,7 +236,7 @@ class PipelineResult(BaseModel):
     error_message: str | None = None
 ```
 
-- [ ] **Step 4: Add config settings**
+- [x] **Step 4: Add config settings**
 
 In `scanbox/config.py`, add to `Config.__init__`:
 
@@ -250,7 +250,7 @@ self.PIPELINE_CONFIDENCE_THRESHOLD: float = float(
 )
 ```
 
-- [ ] **Step 5: Implement PipelineState class**
+- [x] **Step 5: Implement PipelineState class**
 
 Create `scanbox/pipeline/state.py`:
 
@@ -486,16 +486,16 @@ class PipelineState:
         return state
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_pipeline_state.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 7: Format and lint**
+- [x] **Step 7: Format and lint**
 
 Run: `ruff format scanbox/pipeline/state.py scanbox/models.py scanbox/config.py tests/unit/test_pipeline_state.py && ruff check scanbox/pipeline/state.py scanbox/models.py scanbox/config.py tests/unit/test_pipeline_state.py`
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add scanbox/pipeline/state.py scanbox/models.py scanbox/config.py tests/unit/test_pipeline_state.py
@@ -513,7 +513,7 @@ git commit -m "feat: add PipelineState class with stage transitions, DLQ, and le
 
 This is the core refactoring — replace the linear runner with the stage-aware one. The key constraint: **existing tests must keep passing** (with minimal signature adjustments for the new return type).
 
-- [ ] **Step 1: Write tests for new pipeline behavior**
+- [x] **Step 1: Write tests for new pipeline behavior**
 
 Create `tests/unit/test_pipeline_control.py`:
 
@@ -713,12 +713,12 @@ class TestStateJsonUpdated:
         assert state.stages["naming"].status.value == "completed"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_pipeline_control.py -v 2>&1 | tail -5`
 Expected: FAIL
 
-- [ ] **Step 3: Refactor runner.py**
+- [x] **Step 3: Refactor runner.py**
 
 Rewrite `scanbox/pipeline/runner.py` to use `PipelineState`. Key changes:
 
@@ -766,7 +766,7 @@ After all stages complete, read final documents from splits.json and return `Pip
 
 **Backward compatibility:** The old `_read_state` and `_write_state` functions should be removed. `PipelineContext` dataclass stays the same. The `on_progress` callback signature stays the same.
 
-- [ ] **Step 4: Update existing tests in test_runner.py**
+- [x] **Step 4: Update existing tests in test_runner.py**
 
 The existing tests in `tests/unit/test_runner.py` need updates:
 
@@ -779,16 +779,16 @@ Key changes per test:
 - `assert len(docs) == 2` → `assert len(result.documents) == 2`
 - State assertions: verify `PipelineState.load` works instead of raw JSON
 
-- [ ] **Step 5: Run all pipeline tests**
+- [x] **Step 5: Run all pipeline tests**
 
 Run: `pytest tests/unit/test_runner.py tests/unit/test_pipeline_control.py tests/unit/test_pipeline_state.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 6: Format and lint**
+- [x] **Step 6: Format and lint**
 
 Run: `ruff format scanbox/pipeline/runner.py tests/unit/test_runner.py tests/unit/test_pipeline_control.py && ruff check scanbox/pipeline/runner.py tests/unit/test_runner.py tests/unit/test_pipeline_control.py`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scanbox/pipeline/runner.py tests/unit/test_runner.py tests/unit/test_pipeline_control.py
@@ -805,7 +805,7 @@ git commit -m "feat: refactor pipeline runner to stage-aware execution with paus
 
 The `_run_processing` function in scanning.py calls `run_pipeline` and expects `list[SplitDocument]`. It now returns `PipelineResult`. Update the handler to set batch state based on the result status.
 
-- [ ] **Step 1: Update _run_processing in scanning.py**
+- [x] **Step 1: Update _run_processing in scanning.py**
 
 Read `scanbox/api/scanning.py` lines 142-222 (the `_run_processing` function). Key changes:
 
@@ -818,16 +818,16 @@ Read `scanbox/api/scanning.py` lines 142-222 (the `_run_processing` function). K
 
 Also import `PipelineResult` and `PipelineConfig` from models/state.
 
-- [ ] **Step 2: Run existing scanning tests**
+- [x] **Step 2: Run existing scanning tests**
 
 Run: `pytest tests/unit/test_scanning.py -v`
 Expected: Tests pass (may need minor updates for new return type)
 
-- [ ] **Step 3: Format and lint**
+- [x] **Step 3: Format and lint**
 
 Run: `ruff format scanbox/api/scanning.py && ruff check scanbox/api/scanning.py`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scanbox/api/scanning.py tests/unit/test_scanning.py
@@ -844,7 +844,7 @@ git commit -m "feat: update _run_processing to handle PipelineResult (paused, co
 
 Add endpoints for pipeline inspection, resume, retry, skip, and DLQ management.
 
-- [ ] **Step 1: Write tests for pipeline API endpoints**
+- [x] **Step 1: Write tests for pipeline API endpoints**
 
 Create `tests/integration/test_pipeline_api.py`:
 
@@ -942,12 +942,12 @@ class TestDLQEndpoints:
         assert len(resp.json()["items"]) == 0
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_pipeline_api.py -v 2>&1 | tail -5`
 Expected: FAIL — 404 endpoints don't exist
 
-- [ ] **Step 3: Add pipeline control endpoints to batches.py**
+- [x] **Step 3: Add pipeline control endpoints to batches.py**
 
 Add these endpoints to `scanbox/api/batches.py`:
 
@@ -1003,16 +1003,16 @@ Implementation pattern for each:
 5. For resume/retry/advance: `asyncio.create_task(_run_processing(...))`
 6. Return updated state as JSON
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pytest tests/integration/test_pipeline_api.py -v`
 Expected: All tests PASS
 
-- [ ] **Step 5: Format and lint**
+- [x] **Step 5: Format and lint**
 
 Run: `ruff format scanbox/api/batches.py tests/integration/test_pipeline_api.py && ruff check scanbox/api/batches.py tests/integration/test_pipeline_api.py`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/api/batches.py tests/integration/test_pipeline_api.py
@@ -1027,7 +1027,7 @@ git commit -m "feat: add pipeline control API endpoints (resume, retry, skip, DL
 - Modify: `scanbox/api/batches.py`
 - Modify: `scanbox/api/scanning.py`
 
-- [ ] **Step 1: Enhance GET /api/batches/{batch_id} response**
+- [x] **Step 1: Enhance GET /api/batches/{batch_id} response**
 
 Add `pipeline_status` and `current_stage` fields to the batch GET response. Load `PipelineState` from state.json and include a summary:
 
@@ -1048,7 +1048,7 @@ async def get_batch(batch_id: str):
     return batch
 ```
 
-- [ ] **Step 2: Add SSE events for stage results and DLQ**
+- [x] **Step 2: Add SSE events for stage results and DLQ**
 
 In `_run_processing` (scanning.py), emit new SSE event types when stages complete:
 
@@ -1078,12 +1078,12 @@ await event_bus.publish(batch_id, {
 
 These events are emitted from the `on_progress` callback in `_run_processing`, which already has access to the event bus.
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `pytest -v 2>&1 | tail -20`
 Expected: All tests pass
 
-- [ ] **Step 4: Format, lint, commit**
+- [x] **Step 4: Format, lint, commit**
 
 ```bash
 ruff format scanbox/api/batches.py scanbox/api/scanning.py
@@ -1096,16 +1096,16 @@ git commit -m "feat: enhance batch endpoint with pipeline status and add SSE sta
 
 ## Task 6: Final verification and full test suite
 
-- [ ] **Step 1: Format all modified files**
+- [x] **Step 1: Format all modified files**
 
 Run: `ruff format scanbox/ tests/ && ruff check scanbox/ tests/`
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 Run: `pytest -v`
 Expected: All existing tests pass + all new tests pass
 
-- [ ] **Step 3: Verify backward compatibility**
+- [x] **Step 3: Verify backward compatibility**
 
 Test that old-style usage still works:
 
@@ -1119,7 +1119,7 @@ Verify no callers outside of scanning.py use `run_pipeline` directly. If any exi
 
 Run: `grep -r "run_pipeline" scanbox/ tests/ --include="*.py" | grep -v __pycache__`
 
-- [ ] **Step 4: Commit if any fixes needed**
+- [x] **Step 4: Commit if any fixes needed**
 
 ```bash
 git add -A

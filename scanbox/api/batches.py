@@ -34,6 +34,10 @@ class ResolveDLQRequest(BaseModel):
     confidence: float = 1.0
 
 
+class CompareSplitsRequest(BaseModel):
+    models: list[str]
+
+
 async def _get_batch_dir(batch_id: str) -> Path:
     db = get_db()
     batch = await db.get_batch(batch_id)
@@ -654,4 +658,75 @@ async def get_exclusions(batch_id: str):
     return {
         "excluded_pages": state.excluded_pages,
         "excluded_documents": state.excluded_documents,
+    }
+
+
+# --- Compare Splits ---
+
+
+@router.post("/api/batches/{batch_id}/compare")
+async def compare_splits(batch_id: str, req: CompareSplitsRequest):
+    """Run the AI splitter with multiple models and compare results.
+
+    Requires batch to have completed OCR (text_by_page.json must exist).
+    Body: {"models": ["openai/model-a", "anthropic/model-b"]}
+    Returns comparison of splitting results per model.
+    """
+    import json
+
+    from scanbox.pipeline.splitter import split_documents
+
+    batch_dir = await _get_batch_dir(batch_id)
+    text_path = batch_dir / "text_by_page.json"
+    if not text_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="OCR not complete. text_by_page.json not found for this batch.",
+        )
+
+    page_texts_raw = json.loads(text_path.read_text())
+    page_texts = {int(k): v for k, v in page_texts_raw.items()}
+
+    # Look up person name from DB
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    session = await db.get_session(batch["session_id"])
+    person = await db.get_person(session["person_id"])
+    person_name = person["display_name"]
+
+    results = {}
+    for model in req.models:
+        try:
+            docs = await split_documents(page_texts, person_name, model_override=model)
+            results[model] = {
+                "status": "ok",
+                "document_count": len(docs),
+                "documents": [
+                    {
+                        "start_page": d.start_page,
+                        "end_page": d.end_page,
+                        "document_type": d.document_type,
+                        "description": d.description,
+                        "confidence": d.confidence,
+                    }
+                    for d in docs
+                ],
+                "avg_confidence": round(sum(d.confidence for d in docs) / len(docs), 3)
+                if docs
+                else 0.0,
+            }
+        except Exception as e:
+            results[model] = {
+                "status": "error",
+                "error": str(e),
+                "document_count": 0,
+                "documents": [],
+                "avg_confidence": 0.0,
+            }
+
+    return {
+        "batch_id": batch_id,
+        "total_pages": len(page_texts),
+        "models_compared": len(req.models),
+        "results": results,
     }
