@@ -102,14 +102,14 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
     zeroconf = AsyncZeroconf(ip_version=IPVersion.V4Only)
 
     def on_service_state_change(
-        zeroconf_instance: AsyncZeroconf,
+        _zc,  # Zeroconf (sync) from callback — use outer AsyncZeroconf instead
         service_type: str,
         name: str,
         state_change: ServiceStateChange,
     ) -> None:
         if state_change is ServiceStateChange.Added:
             asyncio.run_coroutine_threadsafe(
-                _resolve_and_add(zeroconf_instance, service_type, name, found), loop
+                _resolve_and_add(zeroconf, service_type, name, found), loop
             )
 
     browser = AsyncServiceBrowser(
