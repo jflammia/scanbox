@@ -139,6 +139,7 @@ async def results(request: Request, batch_id: str):
     # Load pipeline summary and exclusion data from state.json
     pipeline_summary = []
     excluded_documents = []
+    dlq_count = 0
     if batch:
         session = await db.get_session(batch["session_id"])
         if session:
@@ -148,6 +149,7 @@ async def results(request: Request, batch_id: str):
             if state_path.exists():
                 state = PipelineState.load(state_path)
                 excluded_documents = state.excluded_documents
+                dlq_count = len(state.dlq)
                 for key, label in _PIPELINE_STAGE_LABELS.items():
                     ss = state.stages.get(key)
                     if ss and ss.status.value == "completed" and ss.result:
@@ -163,6 +165,7 @@ async def results(request: Request, batch_id: str):
             "documents": documents,
             "pipeline_summary": pipeline_summary,
             "excluded_documents": excluded_documents,
+            "dlq_count": dlq_count,
         },
     )
 

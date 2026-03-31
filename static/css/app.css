@@ -345,6 +345,9 @@ select, input, textarea {
 .hover\:bg-red-700:hover { background-color: #b91c1c; }
 .hover\:bg-red-50:hover { background-color: #fef2f2; }
 .hover\:text-status-error:hover { color: var(--color-status-error); }
+.hover\:underline:hover { text-decoration: underline; }
+.bg-status-warning\/10 { background-color: rgba(217,119,6,0.1); }
+.border-status-warning\/30 { border-color: rgba(217,119,6,0.3); }
 .active\:bg-red-800:active { background-color: #991b1b; }
 .active\:bg-gray-200:active { background-color: #e5e7eb; }
 

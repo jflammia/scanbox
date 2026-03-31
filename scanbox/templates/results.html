@@ -15,6 +15,16 @@
     {% if batch %}in Batch {{ batch.batch_num }}{% endif %}
   </h1>
 
+  {% if dlq_count > 0 %}
+  <div class="bg-status-warning/10 border border-status-warning/30 rounded-lg p-4 flex items-center justify-between">
+    <div>
+      <span class="text-status-warning font-semibold">{{ dlq_count }} item{{ 's' if dlq_count != 1 }} need{{ '' if dlq_count != 1 else 's' }} attention</span>
+      <span class="text-text-secondary text-sm ml-2">Documents the AI wasn't sure about</span>
+    </div>
+    <a href="/pipeline/{{ batch.id }}" class="text-brand-600 font-medium no-underline hover:underline">Review &rarr;</a>
+  </div>
+  {% endif %}
+
   {% if pipeline_summary %}
   <div x-data="{ showSummary: false }" class="bg-surface-raised border border-border rounded-lg p-4">
     <button @click="showSummary = !showSummary"
