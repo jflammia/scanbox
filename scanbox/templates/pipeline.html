@@ -25,6 +25,13 @@
     </p>
   </div>
 
+  {# Scan summary — what was scanned #}
+  <div id="scan-summary"
+       hx-get="/batches/{{ batch.id }}/scan-summary"
+       hx-trigger="load"
+       hx-swap="morph:innerHTML">
+  </div>
+
   {# Pipeline stages #}
   <div class="space-y-3" id="pipeline-stages" aria-live="polite">
     {% for stage_key, stage_label in stage_labels.items() %}
