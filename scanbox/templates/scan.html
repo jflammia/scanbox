@@ -98,6 +98,15 @@
     </div>
   </section>
 
+  {# Scan Summary #}
+  <section x-show="currentStep >= 3" x-transition>
+    <div id="scan-summary"
+         hx-get="/batches/{{ batch.id }}/scan-summary"
+         hx-trigger="intersect once"
+         hx-swap="innerHTML">
+    </div>
+  </section>
+
   {# Step 3: Processing #}
   <section class="bg-surface-raised border border-border rounded-lg p-6"
            x-show="currentStep >= 3" x-transition>

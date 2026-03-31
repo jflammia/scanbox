@@ -340,6 +340,50 @@ async def page_thumbnail(batch_id: str, page_num: int):
     return StreamingResponse(buf, media_type="image/jpeg")
 
 
+@router.get("/api/batches/{batch_id}/scan-summary")
+async def scan_summary(batch_id: str):
+    """Get scan summary with page count, thumbnail URLs, and scan metadata."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch_dir = await _get_batch_dir(batch_id)
+    thumbs_dir = batch_dir / "thumbs"
+
+    thumbnails = []
+    if thumbs_dir.exists():
+        for thumb in sorted(thumbs_dir.glob("page-*.jpg")):
+            page_num = int(thumb.stem.split("-")[1])
+            thumbnails.append(
+                {
+                    "page": page_num,
+                    "url": f"/api/batches/{batch_id}/thumbs/{page_num}",
+                }
+            )
+
+    return {
+        "batch_id": batch_id,
+        "fronts_pages": batch.get("fronts_page_count", 0),
+        "backs_pages": batch.get("backs_page_count", 0),
+        "thumbnails": thumbnails,
+        "state": batch["state"],
+    }
+
+
+@router.get("/api/batches/{batch_id}/thumbs/{page_num}")
+async def serve_thumbnail(batch_id: str, page_num: int):
+    """Serve a pre-generated page thumbnail image."""
+    batch_dir = await _get_batch_dir(batch_id)
+    thumb_path = batch_dir / "thumbs" / f"page-{page_num:03d}.jpg"
+    if not thumb_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+    return StreamingResponse(
+        open(thumb_path, "rb"),
+        media_type="image/jpeg",
+    )
+
+
 @router.post("/api/batches/{batch_id}/reprocess", status_code=202)
 async def reprocess_batch(batch_id: str, start_stage: str | None = None):
     """Re-run the processing pipeline on existing scans."""
