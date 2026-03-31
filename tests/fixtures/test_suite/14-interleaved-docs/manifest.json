@@ -1,0 +1,83 @@
+{
+  "generated_at": "2026-03-31T01:59:59.416072+00:00",
+  "patient": {
+    "name": "Elena R. Martinez",
+    "mrn": "JHH-22847391",
+    "dob": "04/12/1968"
+  },
+  "num_sheets": 3,
+  "num_logical_pages": 5,
+  "documents": [
+    {
+      "name": "cbc_lab_report",
+      "description": "CBC with Differential + CMP -- Quest Diagnostics style",
+      "pages": 2,
+      "single_sided": false
+    },
+    {
+      "name": "discharge_summary",
+      "description": "Hospital discharge summary -- Johns Hopkins style",
+      "pages": 3,
+      "single_sided": false
+    }
+  ],
+  "sheets": [
+    {
+      "index": 0,
+      "front": {
+        "doc": "cbc_lab_report",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "cbc_lab_report",
+        "page": 2
+      }
+    },
+    {
+      "index": 1,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 1
+      },
+      "back": {
+        "type": "content",
+        "doc": "discharge_summary",
+        "page": 2
+      }
+    },
+    {
+      "index": 2,
+      "front": {
+        "doc": "discharge_summary",
+        "page": 3
+      },
+      "back": {
+        "type": "blank",
+        "doc": null,
+        "page": null
+      }
+    }
+  ],
+  "backs_order": "reversed",
+  "artifacts_applied": [
+    {
+      "type": "InterleaveDocuments",
+      "doc_a_index": 0,
+      "doc_b_index": 1,
+      "pattern": [
+        0,
+        1,
+        0,
+        1,
+        0
+      ],
+      "result": "Interleaved cbc_lab_report (1 sheets) and discharge_summary (2 sheets)"
+    }
+  ],
+  "counts": {
+    "content_backs": 2,
+    "blank_backs": 1,
+    "near_blank_backs": 0
+  }
+}

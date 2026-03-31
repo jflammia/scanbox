@@ -93,6 +93,24 @@
       </p>
       {% endif %}
 
+      {# Exclusion counts after blank_removal stage #}
+      {% if stage_key == "blank_removal" and status == "completed" %}
+        {% if excluded_pages %}
+        <p class="text-sm text-text-secondary mt-2 ml-2">
+          {{ excluded_pages|length }} page{{ "s" if excluded_pages|length != 1 else "" }} excluded
+        </p>
+        {% endif %}
+      {% endif %}
+
+      {# Exclusion counts after splitting stage #}
+      {% if stage_key == "splitting" and status == "completed" %}
+        {% if excluded_documents %}
+        <p class="text-sm text-text-secondary mt-2 ml-2">
+          {{ excluded_documents|length }} document{{ "s" if excluded_documents|length != 1 else "" }} excluded
+        </p>
+        {% endif %}
+      {% endif %}
+
       {# Expanded detail panel #}
       {% if status == "completed" and stage.get("result") %}
       <div x-show="expanded" x-transition class="mt-3 ml-2 text-sm text-text-secondary bg-gray-100 rounded p-3">

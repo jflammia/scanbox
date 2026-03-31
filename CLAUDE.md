@@ -4,7 +4,7 @@ Development guide for AI agents working on ScanBox.
 
 ## Project Overview
 
-ScanBox is a **fully implemented** self-hosted Docker application that controls a network scanner via eSCL, processes scans through an automated pipeline, and outputs professionally named documents. 802 tests, 94% coverage, all three phases complete.
+ScanBox is a **fully implemented** self-hosted Docker application that controls a network scanner via eSCL, processes scans through an automated pipeline, and outputs professionally named documents. 812 tests, 87% coverage, all three phases complete.
 
 **Three interfaces, one backend:**
 - **REST API** (`/api/*`) — 65+ endpoints with OpenAPI docs at `/api/docs`
@@ -61,7 +61,7 @@ bash .githooks/setup.sh
 python -m tests.generate_fixtures
 
 # Test
-pytest                          # all 802 tests
+pytest                          # all 812 tests
 pytest tests/unit/ -v           # unit tests only
 pytest tests/integration/ -v    # integration tests
 pytest -k "pattern"             # filter

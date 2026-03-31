@@ -30,6 +30,8 @@ SKIP_TOKENS = {
     "page",
     "toast.type",
     "!toast.type",
+    "excluded",
+    "!excluded",
 }
 
 

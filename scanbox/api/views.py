@@ -122,6 +122,8 @@ async def pipeline_page(request: Request, batch_id: str):
             "config": state.config.to_dict(),
             "stage_labels": _PIPELINE_STAGE_LABELS,
             "document_types": DOCUMENT_TYPES,
+            "excluded_pages": state.excluded_pages,
+            "excluded_documents": state.excluded_documents,
         },
     )
 
@@ -134,8 +136,10 @@ async def results(request: Request, batch_id: str):
     batch = await db.get_batch(batch_id)
     documents = await db.list_documents(batch_id)
 
-    # Load pipeline summary for the results page
+    # Load pipeline summary and exclusion data from state.json
     pipeline_summary = []
+    excluded_documents = []
+    dlq_count = 0
     if batch:
         session = await db.get_session(batch["session_id"])
         if session:
@@ -144,6 +148,8 @@ async def results(request: Request, batch_id: str):
             state_path = batch_dir / "state.json"
             if state_path.exists():
                 state = PipelineState.load(state_path)
+                excluded_documents = state.excluded_documents
+                dlq_count = len(state.dlq)
                 for key, label in _PIPELINE_STAGE_LABELS.items():
                     ss = state.stages.get(key)
                     if ss and ss.status.value == "completed" and ss.result:
@@ -154,7 +160,13 @@ async def results(request: Request, batch_id: str):
     return templates.TemplateResponse(
         request,
         "results.html",
-        {"batch": batch, "documents": documents, "pipeline_summary": pipeline_summary},
+        {
+            "batch": batch,
+            "documents": documents,
+            "pipeline_summary": pipeline_summary,
+            "excluded_documents": excluded_documents,
+            "dlq_count": dlq_count,
+        },
     )
 
 

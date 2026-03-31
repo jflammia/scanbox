@@ -82,6 +82,35 @@ class TestResultsScreen:
         assert "Radiology Report" in resp.text
         assert "CT Abdomen" in resp.text
 
+    async def test_results_shows_dlq_banner(self, client: AsyncClient, tmp_path):
+        from scanbox.config import Config
+        from scanbox.pipeline.state import DLQItem, PipelineState
+
+        person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
+        session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
+        batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+
+        cfg = Config()
+        batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch["id"]
+        batch_dir.mkdir(parents=True, exist_ok=True)
+
+        state = PipelineState.new()
+        state.add_to_dlq(
+            DLQItem(stage="naming", document={"type": "Lab Report"}, reason="Low confidence")
+        )
+        state.save(batch_dir / "state.json")
+
+        resp = await client.get(f"/results/{batch['id']}")
+        assert "1 item needs attention" in resp.text
+        assert "Documents the AI" in resp.text
+
+    async def test_results_no_dlq_banner_when_empty(self, client: AsyncClient):
+        person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
+        session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
+        batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        resp = await client.get(f"/results/{batch['id']}")
+        assert "needs attention" not in resp.text
+
 
 class TestSettingsScreen:
     async def test_settings_returns_html(self, client: AsyncClient):
