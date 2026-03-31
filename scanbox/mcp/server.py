@@ -429,6 +429,38 @@ async def scanbox_manage_exclusions(
 
 
 @mcp.tool()
+async def scanbox_compare_splits(batch_id: str, models: list[str]) -> dict:
+    """Compare AI splitting results across different LLM models.
+
+    Requires the batch to have completed OCR. Runs only the splitting stage
+    with each model and returns a side-by-side comparison.
+
+    Args:
+        batch_id: The batch to compare splits for.
+        models: List of litellm model IDs,
+            e.g. ["openai/gpt-4o-mini", "anthropic/claude-haiku-4-5-20251001"].
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{_base_url()}/api/batches/{batch_id}/compare",
+            json={"models": models},
+        )
+        return resp.json()
+
+
+@mcp.tool()
+async def scanbox_calibrate_confidence() -> dict:
+    """Analyze AI splitting confidence across all processed batches.
+
+    Returns confidence distribution, current threshold, and recommendations
+    for threshold tuning based on historical results.
+    """
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{_base_url()}/api/pipeline/calibration")
+        return resp.json()
+
+
+@mcp.tool()
 async def scanbox_reprocess_batch(batch_id: str) -> dict:
     """Re-run the processing pipeline on a batch's existing scans."""
     async with httpx.AsyncClient() as client:

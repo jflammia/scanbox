@@ -109,13 +109,21 @@ def validate_splits(raw_splits: list[dict], total_pages: int) -> list[SplitDocum
 async def split_documents(
     page_texts: dict[int, str],
     person_name: str,
+    model_override: str | None = None,
 ) -> list[SplitDocument]:
-    """Call the LLM to split and classify documents, then validate."""
+    """Call the LLM to split and classify documents, then validate.
+
+    Args:
+        page_texts: Mapping of 1-indexed page numbers to OCR text.
+        person_name: Patient name for prompt context.
+        model_override: If provided, use this model instead of the configured default.
+    """
     prompt = build_prompt(page_texts, person_name)
     total_pages = len(page_texts)
+    model = model_override or config.llm_model_id()
 
     response = await litellm.acompletion(
-        model=config.llm_model_id(),
+        model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
