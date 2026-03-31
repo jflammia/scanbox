@@ -301,8 +301,8 @@ function pipelineView() {
     eventSource: null,
 
     connectSSE() {
-      // Only connect if pipeline is actively running
-      if (this.status !== 'running') return;
+      // Connect for any non-terminal state — pipeline may start momentarily
+      if (this.status === 'completed' || this.status === 'error') return;
 
       this.eventSource = new EventSource('/api/batches/' + this.batchId + '/progress/stream');
       this.eventSource.onmessage = (e) => {

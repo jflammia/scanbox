@@ -105,12 +105,11 @@
       <span class="flex items-center justify-center w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-sm font-bold">3</span>
       <h2 class="text-xl font-semibold">Processing</h2>
     </div>
-    <div id="step3-progress" aria-live="polite">
-      <p class="text-lg text-text-secondary">Your documents are being processed. Progress appears above.</p>
-      <p class="mt-2">
-        <a href="/pipeline/{{ batch.id }}" class="text-brand-600 hover:text-brand-700 text-sm no-underline">
-          View pipeline details &rarr;
-        </a>
+    <div id="step3-progress" aria-live="polite"
+         x-effect="if (currentStep >= 3) window.location.href = '/pipeline/{{ batch.id }}'">
+      <p class="text-lg text-text-secondary flex items-center gap-2">
+        <span class="w-4 h-4 rounded-full animate-spin inline-block" style="border:2px solid rgba(99,102,241,.3);border-top-color:#6366f1"></span>
+        Redirecting to processing view&hellip;
       </p>
     </div>
   </section>
