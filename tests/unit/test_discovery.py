@@ -1,6 +1,10 @@
 """Tests for mDNS scanner discovery module."""
 
+import asyncio
+import threading
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from zeroconf import ServiceStateChange
 
 from scanbox.scanner.discovery import (
     DISCOVERY_HINT,
@@ -217,3 +221,67 @@ class TestDiscoverScanners:
             await discover_scanners(timeout=0.01)
 
         mock_zeroconf.async_close.assert_awaited_once()
+
+    async def test_handler_called_from_background_thread_resolves_scanner(self):
+        """Reproduce GH-82: zeroconf calls handlers from a background thread.
+
+        asyncio.ensure_future raises RuntimeError in Python 3.10+ when called
+        from a thread without a running event loop, so _resolve_and_add never
+        runs and discover_scanners returns [].
+        """
+        mock_zeroconf = AsyncMock()
+        mock_zeroconf.zeroconf = MagicMock()
+
+        mock_info = MagicMock()
+        mock_info.async_request = AsyncMock(return_value=True)
+        mock_info.parsed_addresses.return_value = ["192.168.10.11"]
+        mock_info.port = 8080
+        mock_info.decoded_properties = {
+            "ty": "HP Color LaserJet MFP M283cdw",
+            "rs": "eSCL",
+            "UUID": "abc-123",
+            "representation": "http://192.168.10.11/icon.png",
+        }
+
+        captured_handlers = []
+
+        def capture_browser(zc, types, handlers, **kwargs):
+            captured_handlers.extend(handlers)
+            browser = MagicMock()
+            browser.async_cancel = AsyncMock()
+            return browser
+
+        real_sleep = asyncio.sleep
+
+        with (
+            patch("scanbox.scanner.discovery.AsyncZeroconf", return_value=mock_zeroconf),
+            patch(
+                "scanbox.scanner.discovery.AsyncServiceBrowser",
+                side_effect=capture_browser,
+            ),
+            patch("scanbox.scanner.discovery.AsyncServiceInfo", return_value=mock_info),
+            patch("scanbox.scanner.discovery.asyncio.sleep", new_callable=AsyncMock) as mock_sleep,
+        ):
+
+            async def trigger_handler_from_thread(timeout):
+                handler = captured_handlers[0]
+                t = threading.Thread(
+                    target=handler,
+                    args=(
+                        mock_zeroconf,
+                        "_uscan._tcp.local.",
+                        "HP Scanner._uscan._tcp.local.",
+                        ServiceStateChange.Added,
+                    ),
+                )
+                t.start()
+                t.join()
+                await real_sleep(0.1)  # Let scheduled coroutine run
+
+            mock_sleep.side_effect = trigger_handler_from_thread
+
+            result = await discover_scanners(timeout=0.01)
+
+        assert len(result) == 1
+        assert result[0].ip == "192.168.10.11"
+        assert result[0].model == "HP Color LaserJet MFP M283cdw"

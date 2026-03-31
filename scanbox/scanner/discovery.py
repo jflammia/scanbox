@@ -98,6 +98,7 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
     then returns deduplicated results (preferring secure entries).
     """
     found: list[DiscoveredScanner] = []
+    loop = asyncio.get_running_loop()
     zeroconf = AsyncZeroconf(ip_version=IPVersion.V4Only)
 
     def on_service_state_change(
@@ -107,7 +108,9 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
         state_change: ServiceStateChange,
     ) -> None:
         if state_change is ServiceStateChange.Added:
-            asyncio.ensure_future(_resolve_and_add(zeroconf_instance, service_type, name, found))
+            asyncio.run_coroutine_threadsafe(
+                _resolve_and_add(zeroconf_instance, service_type, name, found), loop
+            )
 
     browser = AsyncServiceBrowser(
         zeroconf.zeroconf,
