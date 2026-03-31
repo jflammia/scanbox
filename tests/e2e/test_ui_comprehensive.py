@@ -692,6 +692,11 @@ class TestSettingsPage:
         assert "Connected" in resp.text
         assert "paperless:8000" in resp.text
 
+    async def test_shows_app_version(self, client: AsyncClient, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "1.2.3")
+        resp = await client.get("/settings")
+        assert "ScanBox 1.2.3" in resp.text
+
 
 # ---------------------------------------------------------------------------
 # Persons list htmx fragment
