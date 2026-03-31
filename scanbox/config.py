@@ -53,8 +53,12 @@ class Config:
             os.getenv("PIPELINE_CONFIDENCE_THRESHOLD", "0.7")
         )
 
-        # Version (set by Docker build arg, defaults to "dev" for local dev)
-        self.APP_VERSION: str = os.getenv("APP_VERSION", "dev")
+        # Version: release tag when set, otherwise short git hash, otherwise "dev"
+        app_version = os.getenv("APP_VERSION", "dev")
+        git_commit = os.getenv("GIT_COMMIT", "unknown")
+        if app_version == "dev" and git_commit not in ("unknown", ""):
+            app_version = f"g{git_commit[:7]}"
+        self.APP_VERSION: str = app_version
 
         # API authentication (optional — off by default for local use)
         self.SCANBOX_API_KEY: str = os.getenv("SCANBOX_API_KEY", "")
