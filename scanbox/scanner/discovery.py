@@ -1,6 +1,7 @@
 """mDNS scanner discovery via zeroconf (eSCL/AirScan service types)."""
 
 import asyncio
+import socket
 from dataclasses import dataclass
 
 from zeroconf import IPVersion, ServiceStateChange
@@ -13,6 +14,61 @@ DISCOVERY_HINT = (
     "If running in Docker, use network_mode: host in your compose file so ScanBox can "
     "discover scanners via mDNS. You can also enter the scanner's IP address manually."
 )
+
+BRIDGE_NETWORK_HINT = (
+    "Scanner discovery is unavailable. ScanBox appears to be running on a Docker bridge "
+    "network, which blocks mDNS multicast. Add network_mode: host to your Docker Compose "
+    "file to enable automatic scanner discovery."
+)
+
+# Docker/Podman bridge subnets (default ranges)
+_BRIDGE_PREFIXES = (
+    "172.17.",
+    "172.18.",
+    "172.19.",
+    "172.20.",
+    "172.21.",
+    "172.22.",
+    "172.23.",
+    "172.24.",
+    "172.25.",
+    "172.26.",
+    "172.27.",
+    "172.28.",
+    "172.29.",
+    "172.30.",
+    "172.31.",
+)
+
+
+def mdns_available() -> bool:
+    """Check if mDNS discovery is likely to work.
+
+    Returns False if the only non-loopback IPs are on Docker bridge subnets
+    (172.17-31.x.x), which means we're in a container without host networking
+    and mDNS multicast won't reach the LAN.
+
+    Returns True on host networking, macvlan, or bare metal (any non-bridge
+    LAN IP found).
+    """
+    try:
+        addrs = socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+        ips = {info[4][0] for info in addrs}
+    except socket.gaierror:
+        ips = set()
+
+    # Filter out loopback
+    non_loopback = {ip for ip in ips if not ip.startswith("127.")}
+
+    if not non_loopback:
+        # No network interfaces at all — can't do mDNS
+        return False
+
+    # If every non-loopback IP is on a Docker bridge subnet, mDNS won't work
+    all_bridge = all(
+        any(ip.startswith(prefix) for prefix in _BRIDGE_PREFIXES) for ip in non_loopback
+    )
+    return not all_bridge
 
 
 @dataclass

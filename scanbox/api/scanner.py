@@ -3,7 +3,12 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from scanbox.config import Config
-from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
+from scanbox.scanner.discovery import (
+    BRIDGE_NETWORK_HINT,
+    DISCOVERY_HINT,
+    discover_scanners,
+    mdns_available,
+)
 from scanbox.scanner.escl import ESCLClient
 
 router = APIRouter(tags=["scanner"])
@@ -61,9 +66,26 @@ async def scanner_capabilities():
         await client.close()
 
 
+@router.get("/api/scanner/mdns-available")
+async def scanner_mdns_check():
+    """Check if mDNS discovery is available (host networking vs bridge)."""
+    available = mdns_available()
+    return {
+        "available": available,
+        "hint": None if available else BRIDGE_NETWORK_HINT,
+    }
+
+
 @router.post("/api/scanner/discover")
 async def scanner_discover(timeout: float = Query(default=5.0)):
     """Discover eSCL scanners on the local network via mDNS."""
+    if not mdns_available():
+        return {
+            "scanners": [],
+            "count": 0,
+            "mdns_available": False,
+            "hint": BRIDGE_NETWORK_HINT,
+        }
     timeout = max(1.0, min(30.0, timeout))
     scanners = await discover_scanners(timeout=timeout)
     return {
@@ -80,6 +102,7 @@ async def scanner_discover(timeout: float = Query(default=5.0)):
             for s in scanners
         ],
         "count": len(scanners),
+        "mdns_available": True,
         "hint": DISCOVERY_HINT if len(scanners) == 0 else None,
     }
 
