@@ -62,7 +62,7 @@ def validate_splits(raw_splits: list[dict], total_pages: int) -> list[SplitDocum
     docs = []
     for s in sorted_splits:
         start = s.get("start_page", 0)
-        end = s.get("end_page", 0)
+        end = s.get("end_page", start)  # default to start_page for single-page docs
 
         if start > end:
             raise SplitValidationError(f"start_page ({start}) > end_page ({end}) — invalid range")
@@ -122,10 +122,17 @@ async def split_documents(
         ],
         response_format={"type": "json_object"},
         temperature=0.1,
+        max_tokens=4096,
     )
 
     content = response.choices[0].message.content
-    parsed = json.loads(content)
+    if not content or not content.strip():
+        raise SplitValidationError("LLM returned empty response")
+
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError as e:
+        raise SplitValidationError(f"LLM returned invalid JSON: {e}") from e
 
     # Handle both {"documents": [...]} and [...] formats
     if isinstance(parsed, dict) and "documents" in parsed:
@@ -178,6 +185,7 @@ async def classify_document_pages(
         ],
         response_format={"type": "json_object"},
         temperature=0.1,
+        max_tokens=1024,
     )
 
     content = response.choices[0].message.content
