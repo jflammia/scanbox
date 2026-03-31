@@ -107,11 +107,13 @@ a:hover { color: var(--color-brand-700); }
 /* Width / Height */
 .w-3 { width: 0.75rem; }
 .w-4 { width: 1rem; }
+.w-6 { width: 1.5rem; }
 .w-8 { width: 2rem; }
 .w-10 { width: 2.5rem; }
 .w-full { width: 100%; }
 .h-3 { height: 0.75rem; }
 .h-4 { height: 1rem; }
+.h-6 { height: 1.5rem; }
 .h-8 { height: 2rem; }
 .h-10 { height: 2.5rem; }
 .h-full { height: 100%; }
