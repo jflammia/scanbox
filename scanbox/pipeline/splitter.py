@@ -122,6 +122,11 @@ async def split_documents(
     total_pages = len(page_texts)
     model = model_override or config.llm_model_id()
 
+    kwargs = {}
+    api_base = config.llm_api_base()
+    if api_base:
+        kwargs["api_base"] = api_base
+
     response = await litellm.acompletion(
         model=model,
         messages=[
@@ -131,6 +136,7 @@ async def split_documents(
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=4096,
+        **kwargs,
     )
 
     content = response.choices[0].message.content
@@ -185,6 +191,11 @@ async def classify_document_pages(
         lines.append(page_texts[page_num])
         lines.append("")
 
+    kwargs = {}
+    api_base = config.llm_api_base()
+    if api_base:
+        kwargs["api_base"] = api_base
+
     response = await litellm.acompletion(
         model=config.llm_model_id(),
         messages=[
@@ -194,6 +205,7 @@ async def classify_document_pages(
         response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=1024,
+        **kwargs,
     )
 
     content = response.choices[0].message.content

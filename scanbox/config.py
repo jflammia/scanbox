@@ -104,5 +104,12 @@ class Config:
         }
         return defaults.get(self.LLM_PROVIDER, "claude-haiku-4-5-20251001")
 
+    def llm_api_base(self) -> str | None:
+        """Return the api_base URL for litellm, or None for cloud providers."""
+        if self.LLM_PROVIDER == "ollama":
+            return self.OLLAMA_URL
+        base = os.getenv("OPENAI_API_BASE", "")
+        return base or None
+
 
 config = Config()
