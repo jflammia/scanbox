@@ -1,0 +1,22 @@
+<div class="bg-surface-raised border border-border rounded-lg p-6 space-y-4">
+  <div class="flex items-center gap-3">
+    <span class="text-status-success font-bold text-xl">&#10003;</span>
+    <h3 class="text-lg font-semibold">
+      {{ batch.fronts_page_count or thumbnails|length }} page{{ "s" if (batch.fronts_page_count or thumbnails|length) != 1 else "" }} scanned
+    </h3>
+  </div>
+
+  {% if thumbnails %}
+  <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+    {% for thumb in thumbnails %}
+    <div class="border border-border rounded overflow-hidden bg-white">
+      <img src="{{ thumb.url }}"
+           alt="Page {{ thumb.page }}"
+           class="w-full h-auto"
+           loading="lazy">
+      <p class="text-xs text-text-muted text-center py-0.5">{{ thumb.page }}</p>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

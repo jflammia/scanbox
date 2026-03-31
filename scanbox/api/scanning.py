@@ -30,6 +30,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["scanning"])
 
 
+def generate_thumbnails(batch_dir: Path, pdf_path: Path) -> int:
+    """Generate page thumbnails from a PDF. Returns page count.
+
+    Thumbnails are saved to batch_dir/thumbs/page-001.jpg etc.
+    Uses 100 DPI for fast rendering and resizes to 200px wide.
+    """
+    from pdf2image import convert_from_path
+
+    thumbs_dir = batch_dir / "thumbs"
+    thumbs_dir.mkdir(exist_ok=True)
+
+    images = convert_from_path(str(pdf_path), dpi=100)
+    for i, img in enumerate(images):
+        ratio = 200 / img.width
+        img = img.resize((200, int(img.height * ratio)))
+        img.save(thumbs_dir / f"page-{i + 1:03d}.jpg", "JPEG", quality=75)
+
+    return len(images)
+
+
 async def _acquire_pages(scanner: ESCLClient, output_pdf: Path, on_page: callable = None) -> int:
     """Scan all pages from the ADF into a single PDF. Returns page count."""
     job_url = await scanner.start_scan()
@@ -74,6 +94,12 @@ async def scan_fronts_task(batch_id: str, db: Database) -> None:
             await event_bus.publish(batch_id, {"type": "page_scanned", "side": "fronts", "page": n})
 
         page_count = await _acquire_pages(scanner, fronts_pdf, on_page=on_page_fronts)
+
+        # Generate thumbnails before updating state so they're available immediately
+        try:
+            generate_thumbnails(batch_dir, fronts_pdf)
+        except Exception:
+            logger.warning("Thumbnail generation failed for batch %s", batch_id, exc_info=True)
 
         await db.update_batch_state(batch_id, "fronts_done", fronts_page_count=page_count)
         await event_bus.publish(
@@ -321,6 +347,13 @@ async def import_batch_endpoint(
         backs_bytes=backs_bytes,
         person_name=person_name,
     )
+
+    # Generate thumbnails from fronts before processing starts
+    fronts_pdf = result.batch_dir / "fronts.pdf"
+    try:
+        generate_thumbnails(result.batch_dir, fronts_pdf)
+    except Exception:
+        logger.warning("Thumbnail generation failed for import batch %s", result.batch_id)
 
     # Write initial pipeline state with config before triggering processing
     pipeline_cfg = PipelineConfig(
