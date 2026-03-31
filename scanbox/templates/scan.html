@@ -11,7 +11,7 @@
 {% block content %}
 <div x-data="{ currentStep: 1, step1Done: false, step2Done: false, scanning: false }"
      x-init="
-       var s = '{{ batch.state }}';
+       let s = '{{ batch.state }}';
        if (s === 'fronts_done' || s === 'scanning_backs') { step1Done = true; currentStep = 2; }
        if (s === 'backs_done' || s === 'processing' || s === 'paused') { step1Done = true; step2Done = true; currentStep = 3; }
      "
