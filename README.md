@@ -95,8 +95,7 @@ The setup wizard walks you through connecting your scanner and LLM on first run.
 services:
   scanbox:
     image: ghcr.io/jflammia/scanbox:latest
-    ports:
-      - "8090:8090"
+    network_mode: host          # Required for mDNS scanner discovery
     env_file:
       - .env
     volumes:
@@ -107,6 +106,8 @@ services:
 volumes:
   scanbox-data:
 ```
+
+> **Why `network_mode: host`?** ScanBox discovers scanners on your network using mDNS (the same protocol Apple AirScan uses). mDNS relies on multicast UDP which doesn't cross Docker/Podman bridge networks. Host networking gives the container direct LAN access so scanner discovery works automatically. The app listens on port 8090.
 
 ### From Source
 
