@@ -1,11 +1,14 @@
 services:
   scanbox:
     build: .
-    ports:
-      - "8090:8090"
+    network_mode: host
     env_file:
       - path: .env
         required: false
+    environment:
+      # network_mode: host means no port mapping — app binds directly to host:8090
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=8090
     volumes:
       - scanbox-data:/app/data
       - ${OUTPUT_DIR:-./output}:/output

@@ -9,10 +9,9 @@ from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo, AsyncZerocon
 ESCL_SERVICE_TYPES = ["_uscan._tcp.local.", "_uscans._tcp.local."]
 
 DISCOVERY_HINT = (
-    "Automatic scanner discovery uses mDNS, which requires the container to have direct LAN "
-    "access (Linux with network_mode: host or macvlan). On macOS or standard Docker bridge "
-    "networking, enter the scanner's IP address manually. You can find it in your scanner's "
-    "network settings or your router's device list."
+    "No scanners found. Make sure your scanner is turned on and connected to the same network. "
+    "If running in Docker, use network_mode: host in your compose file so ScanBox can "
+    "discover scanners via mDNS. You can also enter the scanner's IP address manually."
 )
 
 
