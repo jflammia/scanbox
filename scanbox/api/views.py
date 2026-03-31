@@ -108,7 +108,12 @@ async def pipeline_page(request: Request, batch_id: str):
 
     state = PipelineState.load(batch_dir / "state.json")
 
+    import json as json_mod
+
     from scanbox.models import DOCUMENT_TYPES
+
+    stages_dict = {k: v.to_dict() for k, v in state.stages.items()}
+    dlq_list = [item.to_dict() for item in state.dlq]
 
     return templates.TemplateResponse(
         request,
@@ -117,8 +122,10 @@ async def pipeline_page(request: Request, batch_id: str):
             "batch": batch,
             "person": person,
             "pipeline_status": state.status,
-            "stages": {k: v.to_dict() for k, v in state.stages.items()},
-            "dlq": [item.to_dict() for item in state.dlq],
+            "stages": stages_dict,
+            "dlq": dlq_list,
+            "stages_json": json_mod.dumps(stages_dict),
+            "dlq_json": json_mod.dumps(dlq_list),
             "config": state.config.to_dict(),
             "stage_labels": _PIPELINE_STAGE_LABELS,
             "document_types": DOCUMENT_TYPES,
