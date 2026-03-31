@@ -50,12 +50,50 @@ class TestScanWizard:
         resp = await client.get(f"/scan/{session['id']}/{batch['id']}")
         assert "Scan Front Sides" in resp.text
 
+    async def test_scan_page_restores_state_on_reload(self, client: AsyncClient):
+        """Reloading the scan page for a fronts_done batch restores step 2."""
+        person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
+        session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
+        batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        db = get_db()
+        await db.update_batch_state(batch["id"], "fronts_done")
+        resp = await client.get(f"/scan/{session['id']}/{batch['id']}")
+        html = resp.text
+        assert "step1Done = true" in html
+        assert "currentStep = 2" in html
+
+    async def test_scan_page_restores_processing_state(self, client: AsyncClient):
+        """Reloading for a processing batch shows step 3."""
+        person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
+        session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
+        batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        db = get_db()
+        await db.update_batch_state(batch["id"], "processing")
+        resp = await client.get(f"/scan/{session['id']}/{batch['id']}")
+        html = resp.text
+        assert "step1Done = true" in html
+        assert "step2Done = true" in html
+        assert "currentStep = 3" in html
+
+    async def test_scan_buttons_have_loading_spinner(self, client: AsyncClient):
+        """Scan buttons should show a spinner during requests."""
+        person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
+        session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
+        batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        resp = await client.get(f"/scan/{session['id']}/{batch['id']}")
+        html = resp.text
+        assert "@htmx:before-request.camel" in html
+        assert "animate-spin" in html
+        assert "Starting scan" in html
+
 
 class TestResultsScreen:
     async def test_results_returns_html(self, client: AsyncClient):
         person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        db = get_db()
+        await db.update_batch_state(batch["id"], "review")
         resp = await client.get(f"/results/{batch['id']}")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
@@ -66,6 +104,7 @@ class TestResultsScreen:
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
 
         db = get_db()
+        await db.update_batch_state(batch["id"], "review")
         await db.create_document(
             batch_id=batch["id"],
             start_page=1,
@@ -90,6 +129,9 @@ class TestResultsScreen:
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
 
+        db = get_db()
+        await db.update_batch_state(batch["id"], "review")
+
         cfg = Config()
         batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch["id"]
         batch_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +150,8 @@ class TestResultsScreen:
         person = (await client.post("/api/persons", json={"display_name": "Test"})).json()
         session = (await client.post("/api/sessions", json={"person_id": person["id"]})).json()
         batch = (await client.post(f"/api/sessions/{session['id']}/batches")).json()
+        db = get_db()
+        await db.update_batch_state(batch["id"], "review")
         resp = await client.get(f"/results/{batch['id']}")
         assert "needs attention" not in resp.text
 

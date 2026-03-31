@@ -50,6 +50,8 @@ class TestResultsPageEditButtons:
     async def test_results_page_edit_buttons_use_html_route(self, client: AsyncClient):
         """Edit buttons should use /documents/{id}/edit, not /api/documents/{id}."""
         data = await _setup_doc(client)
+        db = get_db()
+        await db.update_batch_state(data["batch"]["id"], "review")
         resp = await client.get(f"/results/{data['batch']['id']}")
         assert resp.status_code == 200
         html = resp.text
@@ -144,3 +146,105 @@ class TestSkipBacksFlow:
         )
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
+
+
+class TestResultsPageRedirects:
+    """Results page must redirect in-progress batches to the right page."""
+
+    async def test_fronts_done_redirects_to_scan_wizard(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        session_id = data["session"]["id"]
+        await db.update_batch_state(batch_id, "fronts_done")
+        resp = await client.get(f"/results/{batch_id}", follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == f"/scan/{session_id}/{batch_id}"
+
+    async def test_scanning_fronts_redirects_to_scan_wizard(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        session_id = data["session"]["id"]
+        # scanning_fronts is the initial state
+        await db.update_batch_state(batch_id, "scanning_fronts")
+        resp = await client.get(f"/results/{batch_id}", follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == f"/scan/{session_id}/{batch_id}"
+
+    async def test_processing_redirects_to_pipeline(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "processing")
+        resp = await client.get(f"/results/{batch_id}", follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == f"/pipeline/{batch_id}"
+
+    async def test_paused_redirects_to_pipeline(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "paused")
+        resp = await client.get(f"/results/{batch_id}", follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers["location"] == f"/pipeline/{batch_id}"
+
+    async def test_review_state_renders_normally(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "review")
+        resp = await client.get(f"/results/{batch_id}", follow_redirects=False)
+        assert resp.status_code == 200
+
+
+class TestHomePageStateLabels:
+    """Home page must show state-appropriate labels for in-progress sessions."""
+
+    async def test_scanning_state_shows_scanning_label(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "fronts_done")
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert "Scanning" in resp.text
+
+    async def test_processing_state_shows_processing_label(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "processing")
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert "Processing" in resp.text
+
+    async def test_scanning_state_links_to_scan_wizard(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        session_id = data["session"]["id"]
+        await db.update_batch_state(batch_id, "scanning_fronts")
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert f"/scan/{session_id}/{batch_id}" in resp.text
+
+    async def test_processing_state_links_to_pipeline(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "processing")
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert f"/pipeline/{batch_id}" in resp.text
+
+    async def test_review_state_shows_doc_count(self, client: AsyncClient):
+        data = await _setup_doc(client)
+        db = get_db()
+        batch_id = data["batch"]["id"]
+        await db.update_batch_state(batch_id, "review")
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        # Should show "1 docs" (the document created by _setup_doc)
+        assert "1 docs" in resp.text

@@ -54,7 +54,7 @@ async def _acquire_pages(scanner: ESCLClient, output_pdf: Path, on_page: callabl
 
     output_pdf.parent.mkdir(parents=True, exist_ok=True)
     combined.save(output_pdf)
-    return len(pages)
+    return len(combined.pages)
 
 
 async def scan_fronts_task(batch_id: str, db: Database) -> None:

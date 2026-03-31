@@ -9,7 +9,13 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="{ currentStep: 1, step1Done: false, step2Done: false }" class="space-y-6">
+<div x-data="{ currentStep: 1, step1Done: false, step2Done: false, scanning: false }"
+     x-init="
+       var s = '{{ batch.state }}';
+       if (s === 'fronts_done' || s === 'scanning_backs') { step1Done = true; currentStep = 2; }
+       if (s === 'backs_done' || s === 'processing' || s === 'paused') { step1Done = true; step2Done = true; currentStep = 3; }
+     "
+     class="space-y-6">
 
   {# Step 1: Scan Front Sides #}
   <section class="bg-surface-raised border border-border rounded-lg p-6 transition-opacity"
@@ -35,8 +41,14 @@
               hx-post="/batches/{{ batch.id }}/scan-fronts"
               hx-target="#step1-progress"
               hx-swap="innerHTML"
-              hx-disabled-elt="this">
-        Scan Front Sides
+              hx-disabled-elt="this"
+              @htmx:before-request.camel="scanning = true"
+              @htmx:after-request.camel="scanning = false">
+        <span x-show="!scanning">Scan Front Sides</span>
+        <span x-show="scanning" x-cloak class="flex items-center gap-2">
+          <span class="w-4 h-4 rounded-full animate-spin inline-block" style="border:2px solid rgba(255,255,255,.3);border-top-color:#fff"></span>
+          Starting scan&hellip;
+        </span>
       </button>
     </div>
   </section>
@@ -67,8 +79,14 @@
                 hx-post="/batches/{{ batch.id }}/scan-backs"
                 hx-target="#step2-progress"
                 hx-swap="innerHTML"
-                hx-disabled-elt="this">
-          Scan Back Sides
+                hx-disabled-elt="this"
+                @htmx:before-request.camel="scanning = true"
+                @htmx:after-request.camel="scanning = false">
+          <span x-show="!scanning">Scan Back Sides</span>
+          <span x-show="scanning" x-cloak class="flex items-center gap-2">
+            <span class="w-4 h-4 rounded-full animate-spin inline-block" style="border:2px solid rgba(255,255,255,.3);border-top-color:#fff"></span>
+            Starting scan&hellip;
+          </span>
         </button>
         <a href="#" class="text-brand-600 hover:text-brand-700 text-base no-underline"
            hx-post="/batches/{{ batch.id }}/skip-backs"

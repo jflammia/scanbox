@@ -1,5 +1,6 @@
 """Unit tests for background scanning tasks with mocked scanner and pipeline."""
 
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -396,3 +397,65 @@ class TestRunProcessing:
         mock_bus.publish.assert_any_call(
             batch_id, {"type": "progress", "stage": "ocr", "detail": "Reading..."}
         )
+
+    @patch("scanbox.api.scanning.ESCLClient")
+    async def test_acquire_pages_multipage_pdf_response(self, mock_escl_cls, tmp_path):
+        """Page count comes from combined PDF pages, not response count."""
+        from scanbox.api.scanning import _acquire_pages
+
+        mock_scanner = AsyncMock()
+        mock_scanner.start_scan.return_value = "http://scanner/job/1"
+
+        # Create a 3-page PDF as a single response
+        buf = BytesIO()
+        pdf = pikepdf.Pdf.new()
+        for _ in range(3):
+            pdf.add_blank_page(page_size=(612, 792))
+        pdf.save(buf)
+        multipage_bytes = buf.getvalue()
+
+        mock_scanner.get_next_page.side_effect = [multipage_bytes, None]
+
+        output = tmp_path / "fronts.pdf"
+        count = await _acquire_pages(mock_scanner, output)
+
+        assert count == 3
+        result_pdf = pikepdf.Pdf.open(output)
+        assert len(result_pdf.pages) == 3
+
+
+class TestRenderProgressEvent:
+    @pytest.fixture(autouse=True)
+    def _import_render(self):
+        import importlib
+        import sys
+        from types import ModuleType
+        from unittest.mock import MagicMock
+
+        # Break the circular import by pre-seeding scanbox.main in sys.modules
+        needs_cleanup = "scanbox.api.views" not in sys.modules
+        if needs_cleanup:
+            fake_main = ModuleType("scanbox.main")
+            fake_main.get_db = MagicMock()
+            saved = sys.modules.get("scanbox.main")
+            sys.modules["scanbox.main"] = fake_main
+            import scanbox.api.views
+
+            importlib.reload(scanbox.api.views)
+            if saved is not None:
+                sys.modules["scanbox.main"] = saved
+            else:
+                del sys.modules["scanbox.main"]
+
+        from scanbox.api.views import _render_progress_event
+
+        self._render = _render_progress_event
+
+    def test_scan_complete_uses_pages_key(self):
+        html = self._render({"type": "scan_complete", "side": "fronts", "pages": 5}, "batch-1")
+        assert "5 pages" in html
+
+    def test_done_uses_document_count_key(self):
+        html = self._render({"type": "done", "document_count": 3}, "batch-1")
+        assert "3" in html
+        assert "ready for review" in html
