@@ -348,8 +348,10 @@ async def skip_backs_html(request: Request, batch_id: str):
 
 @router.get("/scanner/status", response_class=HTMLResponse)
 async def scanner_status():
-    cfg = Config()
-    if not cfg.SCANNER_IP:
+    from scanbox.scanner.monitor import scanner_monitor
+
+    state = scanner_monitor.state
+    if not state.ip:
         return HTMLResponse(
             '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
             'hover:text-text-secondary">'
@@ -358,13 +360,8 @@ async def scanner_status():
             "</a>"
         )
 
-    from scanbox.scanner.escl import ESCLClient
-
-    client = ESCLClient(cfg.SCANNER_IP)
-    try:
-        await client.get_status()
-        caps = await client.get_capabilities()
-        model = caps.make_and_model or cfg.SCANNER_IP
+    if state.connected:
+        model = state.capabilities.make_and_model if state.capabilities else state.ip
         return HTMLResponse(
             '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
             'hover:text-text-secondary">'
@@ -372,16 +369,14 @@ async def scanner_status():
             f" <span>{model}</span>"
             "</a>"
         )
-    except Exception:
+    else:
         return HTMLResponse(
             '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
             'hover:text-text-secondary">'
             '<span class="inline-block w-3 h-3 rounded-full bg-status-error"></span>'
-            f" <span>Can't reach scanner ({cfg.SCANNER_IP})</span>"
+            f" <span>Can't reach scanner ({state.ip})</span>"
             "</a>"
         )
-    finally:
-        await client.close()
 
 
 @router.get("/settings")
@@ -437,8 +432,10 @@ async def scanner_page(request: Request):
 @router.get("/scanner/status-card", response_class=HTMLResponse)
 async def scanner_status_card():
     """Rich status card partial for the scanner page."""
-    cfg = Config()
-    if not cfg.SCANNER_IP:
+    from scanbox.scanner.monitor import scanner_monitor
+
+    state = scanner_monitor.state
+    if not state.ip:
         return HTMLResponse(
             '<div class="flex items-center gap-4">'
             '<span class="w-4 h-4 rounded-full bg-gray-300 flex-shrink-0"></span>'
@@ -450,14 +447,9 @@ async def scanner_status_card():
             "</div>"
         )
 
-    from scanbox.scanner.escl import ESCLClient
-
-    client = ESCLClient(cfg.SCANNER_IP)
-    try:
-        status = await client.get_status()
-        caps = await client.get_capabilities()
-        model = caps.make_and_model or "Scanner"
-        adf_text = "Paper loaded" if status.adf_loaded else "Empty"
+    if state.connected:
+        model = state.capabilities.make_and_model if state.capabilities else "Scanner"
+        adf_text = "Paper loaded" if state.status and state.status.adf_loaded else "Empty"
         return HTMLResponse(
             '<div class="flex items-center gap-4">'
             '<img src="/api/scanner/icon" alt="" class="w-16 h-16 object-contain rounded"'
@@ -468,30 +460,30 @@ async def scanner_status_card():
             '<span class="font-medium">Connected</span>'
             "</div>"
             f'<p class="text-lg font-semibold">{model}</p>'
-            f'<p class="text-sm text-text-secondary">{cfg.SCANNER_IP}</p>'
+            f'<p class="text-sm text-text-secondary">{state.ip}</p>'
             f'<p class="text-sm text-text-muted">Document feeder: {adf_text}</p>'
             "</div>"
             "</div>"
         )
-    except Exception:
+    else:
         return HTMLResponse(
             '<div class="flex items-center gap-4">'
             '<span class="w-4 h-4 rounded-full bg-status-error flex-shrink-0"></span>'
             "<div>"
             f'<p class="font-medium">Can\'t reach scanner</p>'
-            f'<p class="text-sm text-text-secondary">{cfg.SCANNER_IP}</p>'
+            f'<p class="text-sm text-text-secondary">{state.ip}</p>'
             '<p class="text-sm text-text-muted">'
             "Check that the scanner is on and connected to your network.</p>"
             "</div>"
             "</div>"
         )
-    finally:
-        await client.close()
 
 
 @router.post("/scanner/set-ip", response_class=HTMLResponse)
 async def set_scanner_ip(request: Request):
     """Save a scanner IP and test the connection."""
+    from scanbox.scanner.monitor import scanner_monitor
+
     form = await request.form()
     scanner_ip = str(form.get("scanner_ip", "")).strip()
 
@@ -511,23 +503,20 @@ async def set_scanner_ip(request: Request):
     data["scanner_ip"] = scanner_ip
     runtime_path.write_text(json.dumps(data))
 
-    # Test connection
-    from scanbox.scanner.escl import ESCLClient
+    # Restart monitor with new IP and test connection
+    await scanner_monitor.start(scanner_ip)
+    state = await scanner_monitor.refresh_now()
 
-    client = ESCLClient(scanner_ip)
-    try:
-        caps = await client.get_capabilities()
-        model = caps.make_and_model or "Scanner"
+    if state.connected:
+        model = state.capabilities.make_and_model if state.capabilities else "Scanner"
         return HTMLResponse(
             f'<p class="text-status-success font-medium">Connected to {model} at {scanner_ip}</p>'
         )
-    except Exception:
+    else:
         return HTMLResponse(
             f'<p class="text-status-warning font-medium">'
             f"Saved {scanner_ip} but can't reach it yet. Is the scanner on?</p>"
         )
-    finally:
-        await client.close()
 
 
 @router.post("/scanner/discover", response_class=HTMLResponse)
