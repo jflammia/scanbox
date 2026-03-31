@@ -394,8 +394,13 @@ async def test_paperless():
 @router.get("/setup")
 async def setup_page(request: Request):
     data = _read_setup()
+    cfg = Config()
     return templates.TemplateResponse(
         request,
         "setup.html",
-        {"current_step": data.get("current_step", 1), "total_steps": TOTAL_STEPS},
+        {
+            "current_step": data.get("current_step", 1),
+            "total_steps": TOTAL_STEPS,
+            "scanner_configured": bool(cfg.SCANNER_IP),
+        },
     )

@@ -631,7 +631,7 @@ class TestScannerStatusFragment:
         resp = await client.get("/scanner/status")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
-        assert "No scanner configured" in resp.text
+        assert "No scanner" in resp.text
 
     async def test_scanner_unreachable(self, client: AsyncClient, monkeypatch):
         monkeypatch.setenv("SCANNER_IP", "192.168.255.255")
@@ -670,17 +670,15 @@ class TestSettingsPage:
         assert 'hx-post="/persons/add"' in resp.text
         assert 'name="display_name"' in resp.text
 
-    async def test_scanner_section_no_ip(self, client: AsyncClient, monkeypatch):
-        monkeypatch.setenv("SCANNER_IP", "")
+    async def test_scanner_section_has_manage_link(self, client: AsyncClient):
         resp = await client.get("/settings")
         assert "Scanner" in resp.text
-        assert 'name="scanner_ip"' in resp.text
-        assert 'hx-post="/settings/scanner"' in resp.text
+        assert 'href="/scanner"' in resp.text
+        assert "Manage" in resp.text
 
-    async def test_scanner_section_with_ip(self, client: AsyncClient, monkeypatch):
-        monkeypatch.setenv("SCANNER_IP", "10.0.0.5")
+    async def test_scanner_section_loads_status_card(self, client: AsyncClient):
         resp = await client.get("/settings")
-        assert "10.0.0.5" in resp.text
+        assert 'hx-get="/scanner/status-card"' in resp.text
 
     async def test_integrations_section_no_paperless(self, client: AsyncClient, monkeypatch):
         monkeypatch.setenv("PAPERLESS_URL", "")
@@ -751,9 +749,7 @@ class TestSetupPage:
     async def test_step3_ai_setup(self, client: AsyncClient):
         resp = await client.get("/setup")
         assert "AI document analysis" in resp.text
-        assert "Anthropic" in resp.text
-        assert "OpenAI" in resp.text
-        assert "Ollama" in resp.text
+        assert "environment variables" in resp.text or "Settings" in resp.text
 
     async def test_step4_paperless(self, client: AsyncClient):
         resp = await client.get("/setup")

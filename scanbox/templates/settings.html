@@ -36,30 +36,13 @@
       </div>
     </section>
 
-    <section class="bg-surface-raised border border-border rounded-lg p-6" x-data>
-      <h2 class="text-xl font-semibold mb-4">Scanner</h2>
-      <form class="space-y-3" hx-post="/settings/scanner" hx-target="#scanner-result" hx-swap="innerHTML">
-        <label class="block text-sm text-text-secondary">Scanner IP address</label>
-        <div class="flex gap-2">
-          <input type="text" name="scanner_ip" x-ref="scannerIp" value="{{ scanner_ip }}" placeholder="e.g. 192.168.1.100"
-                 class="flex-1 border border-border rounded-md px-4 py-2 text-base bg-surface-raised focus:outline-none focus:ring-2 focus:ring-brand-500">
-          <button type="submit"
-                  class="px-4 py-2 rounded-md bg-brand-600 text-white font-medium hover:bg-brand-700">
-            Save
-          </button>
-        </div>
-        <div id="scanner-result"></div>
-      </form>
-
-      <div class="mt-4 space-y-3">
-        <button type="button"
-                hx-post="/setup/discover-scanners"
-                hx-target="#settings-discover-result"
-                hx-swap="innerHTML"
-                class="text-sm px-4 py-2 min-h-10 rounded-md bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50 transition-colors">
-          Rescan Network
-        </button>
-        <div id="settings-discover-result"></div>
+    <section class="bg-surface-raised border border-border rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">Scanner</h2>
+        <a href="/scanner" class="text-brand-600 text-sm no-underline hover:underline">Manage &rarr;</a>
+      </div>
+      <div id="settings-scanner-status" hx-get="/scanner/status-card" hx-trigger="load" hx-swap="innerHTML">
+        <p class="text-text-muted">Checking...</p>
       </div>
     </section>
 

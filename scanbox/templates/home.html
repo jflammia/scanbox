@@ -37,10 +37,20 @@
     </div>
 
     <div class="text-center pt-2">
+      {% if scanner_configured %}
       <button type="submit"
               class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 active:bg-brand-800 focus:outline-none focus:ring-3 focus:ring-brand-500 focus:ring-offset-2 transition-colors duration-150">
         Start Scanning
       </button>
+      {% else %}
+      <button disabled
+              class="bg-gray-300 text-gray-500 text-lg px-8 py-4 min-h-14 rounded-lg font-semibold cursor-not-allowed">
+        Start Scanning
+      </button>
+      <p class="text-sm text-text-muted mt-2">
+        <a href="/scanner" class="text-brand-600 underline">Configure a scanner</a> to start scanning.
+      </p>
+      {% endif %}
     </div>
   </form>
 
