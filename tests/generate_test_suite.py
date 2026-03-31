@@ -20,6 +20,7 @@ from tests.medical_documents.assembler import (
     BlankSheetInserted,
     DuplicateDocument,
     DuplicatePage,
+    InterleaveDocuments,
     RotatedPage,
     ShufflePages,
     WrongPatientDocument,
@@ -279,6 +280,20 @@ def pile_13_large_stress_test() -> PileConfig:
     )
 
 
+def pile_14_interleaved_docs() -> PileConfig:
+    """Two documents with interleaved pages (papers got shuffled together).
+    Tests that pages from two documents get mixed together correctly.
+    """
+    return PileConfig(
+        patient=DEFAULT_PATIENT,
+        documents=["cbc_lab_report", "discharge_summary"],
+        artifacts=[
+            InterleaveDocuments(doc_a_index=0, doc_b_index=1, pattern=[0, 1, 0, 1, 0]),
+        ],
+        output_dir=SUITE_DIR / "14-interleaved-docs",
+    )
+
+
 # -- Registry --
 
 PILES = {
@@ -295,6 +310,7 @@ PILES = {
     "11-different-patient": pile_11_different_patient,
     "12-chaos-kitchen-sink": pile_12_chaos_kitchen_sink,
     "13-large-stress-test": pile_13_large_stress_test,
+    "14-interleaved-docs": pile_14_interleaved_docs,
 }
 
 

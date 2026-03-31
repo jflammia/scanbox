@@ -243,6 +243,8 @@ class PileAssembler:
                 sheets, entry = self._apply_blank_insert(artifact, sheets)
             elif isinstance(artifact, (WrongPatientDocument, StrayDocument)):
                 sheets, entry = self._apply_foreign_doc(artifact, config, sheets, REGISTRY)
+            elif isinstance(artifact, InterleaveDocuments):
+                sheets, entry = self._apply_interleave(artifact, sheets, doc_metas)
             elif isinstance(artifact, RotatedPage):
                 entry = self._apply_rotation(artifact, sheets, doc_metas)
             else:
@@ -474,6 +476,64 @@ class PileAssembler:
             "doc_index": artifact.doc_index,
             "page": artifact.page,
             "result": "Page not found — skipped",
+        }
+
+    def _apply_interleave(
+        self,
+        artifact: InterleaveDocuments,
+        sheets: list[dict],
+        doc_metas: list[dict],
+    ) -> tuple[list[dict], dict]:
+        """Interleave pages from two documents according to the pattern."""
+        doc_a_name = doc_metas[artifact.doc_a_index]["name"]
+        doc_b_name = doc_metas[artifact.doc_b_index]["name"]
+
+        # Collect sheet indices for each document
+        a_indices = [i for i, s in enumerate(sheets) if s["front_doc"] == doc_a_name]
+        b_indices = [i for i, s in enumerate(sheets) if s["front_doc"] == doc_b_name]
+
+        if not a_indices or not b_indices:
+            return sheets, {
+                "type": "InterleaveDocuments",
+                "doc_a_index": artifact.doc_a_index,
+                "doc_b_index": artifact.doc_b_index,
+                "result": "One or both documents not found — skipped",
+            }
+
+        # Extract sheets for both documents
+        a_sheets = [sheets[i] for i in a_indices]
+        b_sheets = [sheets[i] for i in b_indices]
+
+        # Build interleaved sequence according to pattern
+        interleaved = []
+        a_iter, b_iter = iter(a_sheets), iter(b_sheets)
+        for selector in artifact.pattern:
+            src = a_iter if selector == 0 else b_iter
+            page = next(src, None)
+            if page is not None:
+                interleaved.append(page)
+
+        # Append any remaining pages from both iterators
+        for remaining in a_iter:
+            interleaved.append(remaining)
+        for remaining in b_iter:
+            interleaved.append(remaining)
+
+        # Remove all original sheets for both documents and insert interleaved block
+        all_indices = sorted(a_indices + b_indices)
+        insert_pos = all_indices[0]
+        new_sheets = [s for i, s in enumerate(sheets) if i not in set(all_indices)]
+        new_sheets = new_sheets[:insert_pos] + interleaved + new_sheets[insert_pos:]
+
+        return new_sheets, {
+            "type": "InterleaveDocuments",
+            "doc_a_index": artifact.doc_a_index,
+            "doc_b_index": artifact.doc_b_index,
+            "pattern": artifact.pattern,
+            "result": (
+                f"Interleaved {doc_a_name} ({len(a_sheets)} sheets) "
+                f"and {doc_b_name} ({len(b_sheets)} sheets)"
+            ),
         }
 
     def _split_fronts_backs(self, sheets: list[dict], output_dir: Path) -> tuple[Path, Path]:
