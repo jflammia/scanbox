@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from scanbox.api.scanning import (
     _run_processing,
@@ -22,6 +23,15 @@ from scanbox.pipeline.output import append_index_csv, write_archive, write_medic
 from scanbox.pipeline.state import PipelineState
 
 router = APIRouter(tags=["batches"])
+
+
+class ResolveDLQRequest(BaseModel):
+    document_type: str
+    date_of_service: str = "unknown"
+    facility: str = "unknown"
+    provider: str = "unknown"
+    description: str = "Document"
+    confidence: float = 1.0
 
 
 async def _get_batch_dir(batch_id: str) -> Path:
@@ -327,8 +337,10 @@ async def page_thumbnail(batch_id: str, page_num: int):
 
 
 @router.post("/api/batches/{batch_id}/reprocess", status_code=202)
-async def reprocess_batch(batch_id: str):
+async def reprocess_batch(batch_id: str, start_stage: str | None = None):
     """Re-run the processing pipeline on existing scans."""
+    import json
+
     db = get_db()
     batch = await db.get_batch(batch_id)
     if not batch:
@@ -349,11 +361,45 @@ async def reprocess_batch(batch_id: str):
     if not (batch_dir / "fronts.pdf").exists():
         raise HTTPException(status_code=404, detail="Source scan files not found")
 
-    # Delete existing documents and state to force re-run
-    await db.delete_documents_by_batch(batch_id)
-    state_file = batch_dir / "state.json"
-    if state_file.exists():
-        state_file.unlink()
+    if start_stage:
+        from scanbox.pipeline.state import STAGE_ORDER, StageStatus
+
+        state = PipelineState.load(batch_dir / "state.json")
+        found = False
+        for stage in STAGE_ORDER:
+            if stage.value == start_stage:
+                found = True
+            if found:
+                state.stages[stage.value].status = StageStatus.PENDING
+                state.stages[stage.value].result = None
+                state.stages[stage.value].error = None
+                state.stages[stage.value].pause_reason = None
+        if not found:
+            raise HTTPException(status_code=400, detail=f"Unknown stage: {start_stage}")
+        state.save(batch_dir / "state.json")
+    else:
+        # Full reprocess: save user overrides before deleting, then delete everything
+        docs = await db.list_documents(batch_id)
+        user_overrides = [
+            {
+                "start_page": d["start_page"],
+                "end_page": d["end_page"],
+                "document_type": d["document_type"],
+                "date_of_service": d["date_of_service"],
+                "facility": d["facility"],
+                "provider": d["provider"],
+                "description": d["description"],
+            }
+            for d in docs
+            if d.get("user_edited")
+        ]
+        if user_overrides:
+            (batch_dir / "user_overrides.json").write_text(json.dumps(user_overrides, indent=2))
+
+        await db.delete_documents_by_batch(batch_id)
+        state_file = batch_dir / "state.json"
+        if state_file.exists():
+            state_file.unlink()
 
     asyncio.create_task(_run_processing(batch_id, db, has_backs=has_backs))
 
@@ -501,6 +547,60 @@ async def discard_dlq_item(batch_id: str, item_id: str):
         raise HTTPException(status_code=404, detail=f"DLQ item {item_id} not found") from None
     state.save(batch_dir / "state.json")
     return {"status": "discarded", "item_id": item_id}
+
+
+@router.post("/api/batches/{batch_id}/dlq/{item_id}/resolve")
+async def resolve_dlq_item(batch_id: str, item_id: str, req: ResolveDLQRequest):
+    """Manually resolve a DLQ item by providing correct metadata."""
+    import json
+
+    batch_dir = await _get_batch_dir(batch_id)
+    state = PipelineState.load(batch_dir / "state.json")
+
+    # Find the DLQ item
+    dlq_item = None
+    for item in state.dlq:
+        if item.id == item_id:
+            dlq_item = item
+            break
+    if not dlq_item:
+        raise HTTPException(status_code=404, detail=f"DLQ item {item_id} not found")
+
+    body = req.model_dump()
+
+    # Load and update splits.json
+    splits_path = batch_dir / "splits.json"
+    if splits_path.exists():
+        splits = json.loads(splits_path.read_text())
+        start_page = dlq_item.document.get("start_page")
+        end_page = dlq_item.document.get("end_page")
+        for split in splits:
+            if split.get("start_page") == start_page and split.get("end_page") == end_page:
+                for field in (
+                    "document_type",
+                    "date_of_service",
+                    "facility",
+                    "provider",
+                    "description",
+                ):
+                    split[field] = body[field]
+                split["user_edited"] = True
+                split["confidence"] = body["confidence"]
+                break
+        splits_path.write_text(json.dumps(splits, indent=2))
+
+    # Build the updated document dict
+    updated_doc = dict(dlq_item.document)
+    for field in ("document_type", "date_of_service", "facility", "provider", "description"):
+        updated_doc[field] = body[field]
+    updated_doc["user_edited"] = True
+    updated_doc["confidence"] = body["confidence"]
+
+    # Remove from DLQ
+    state.remove_from_dlq(item_id)
+    state.save(batch_dir / "state.json")
+
+    return {"status": "resolved", "item_id": item_id, "document": updated_doc}
 
 
 # --- Exclusions ---

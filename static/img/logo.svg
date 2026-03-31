@@ -5,5 +5,5 @@
   <rect x="6" y="18" width="20" height="4" rx="1" fill="#2563eb" opacity="0.1"/>
   <rect x="6" y="26" width="20" height="4" rx="1" fill="#2563eb" opacity="0.05"/>
   <!-- ScanBox -->
-  <text x="40" y="29" font-family="DM Sans, system-ui, sans-serif" font-size="24" font-weight="700" fill="#0f172a">Scan<tspan fill="#2563eb">Box</tspan></text>
+  <text x="40" y="29" font-family="DM Sans, system-ui, sans-serif" font-size="24" font-weight="700" fill="currentColor">Scan<tspan fill="#2563eb">Box</tspan></text>
 </svg>

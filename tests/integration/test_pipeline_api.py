@@ -293,6 +293,214 @@ class TestDLQEndpoints:
         assert resp.status_code == 404
 
 
+class TestDLQResolve:
+    async def test_resolve_updates_splits_json(self, client):
+        import json
+
+        batch_id, batch_dir = await _create_batch(client)
+        state = PipelineState.new()
+        state.mark_completed(ProcessingStage.INTERLEAVING)
+        state.mark_completed(ProcessingStage.BLANK_REMOVAL)
+        state.mark_completed(ProcessingStage.OCR)
+        state.mark_completed(ProcessingStage.SPLITTING, {"document_count": 2})
+        state.add_to_dlq(
+            DLQItem(
+                stage="splitting",
+                document={
+                    "start_page": 3,
+                    "end_page": 4,
+                    "document_type": "Other",
+                    "confidence": 0.3,
+                },
+                reason="Low confidence",
+            )
+        )
+        state.save(batch_dir / "state.json")
+
+        splits = [
+            {
+                "start_page": 1,
+                "end_page": 2,
+                "document_type": "Lab Results",
+                "confidence": 0.95,
+            },
+            {
+                "start_page": 3,
+                "end_page": 4,
+                "document_type": "Other",
+                "confidence": 0.3,
+            },
+        ]
+        (batch_dir / "splits.json").write_text(json.dumps(splits))
+
+        item_id = state.dlq[0].id
+
+        resp = await client.post(
+            f"/api/batches/{batch_id}/dlq/{item_id}/resolve",
+            json={
+                "document_type": "Discharge Summary",
+                "date_of_service": "2026-03-15",
+                "facility": "Johns Hopkins",
+                "provider": "Dr. Patel",
+                "description": "Post-surgery discharge",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["document"]["document_type"] == "Discharge Summary"
+        assert data["document"]["user_edited"] is True
+        assert data["document"]["confidence"] == 1.0
+
+        # DLQ should be empty now
+        resp = await client.get(f"/api/batches/{batch_id}/dlq")
+        assert len(resp.json()["items"]) == 0
+
+        # splits.json should be updated
+        updated_splits = json.loads((batch_dir / "splits.json").read_text())
+        assert updated_splits[1]["document_type"] == "Discharge Summary"
+        assert updated_splits[1]["user_edited"] is True
+        assert updated_splits[1]["confidence"] == 1.0
+
+    async def test_resolve_nonexistent_returns_404(self, client):
+        batch_id, batch_dir = await _create_batch(client)
+        PipelineState.new().save(batch_dir / "state.json")
+        resp = await client.post(
+            f"/api/batches/{batch_id}/dlq/dlq-nonexistent/resolve",
+            json={"document_type": "Lab Results"},
+        )
+        assert resp.status_code == 404
+
+    async def test_resolve_without_splits_json(self, client):
+        batch_id, batch_dir = await _create_batch(client)
+        state = PipelineState.new()
+        state.add_to_dlq(
+            DLQItem(
+                stage="splitting",
+                document={
+                    "start_page": 1,
+                    "end_page": 2,
+                    "document_type": "Other",
+                    "confidence": 0.3,
+                },
+                reason="Low confidence",
+            )
+        )
+        state.save(batch_dir / "state.json")
+        item_id = state.dlq[0].id
+
+        resp = await client.post(
+            f"/api/batches/{batch_id}/dlq/{item_id}/resolve",
+            json={"document_type": "Lab Results", "facility": "Quest Diagnostics"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["document"]["document_type"] == "Lab Results"
+        assert data["document"]["facility"] == "Quest Diagnostics"
+        assert data["document"]["user_edited"] is True
+
+    async def test_resolve_with_custom_confidence(self, client):
+        batch_id, batch_dir = await _create_batch(client)
+        state = PipelineState.new()
+        state.add_to_dlq(
+            DLQItem(
+                stage="splitting",
+                document={"start_page": 1, "end_page": 1, "document_type": "Other"},
+                reason="Low confidence",
+            )
+        )
+        state.save(batch_dir / "state.json")
+        item_id = state.dlq[0].id
+
+        resp = await client.post(
+            f"/api/batches/{batch_id}/dlq/{item_id}/resolve",
+            json={"document_type": "Lab Results", "confidence": 0.9},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["document"]["confidence"] == 0.9
+
+
+class TestReprocessWithStartStage:
+    async def test_reprocess_from_stage(self, client):
+        batch_id, batch_dir = await _create_batch(client)
+        db = get_db()
+        await db.update_batch_state(batch_id, "review")
+        # Create completed state
+        state = PipelineState.new()
+        for stage in [
+            ProcessingStage.INTERLEAVING,
+            ProcessingStage.BLANK_REMOVAL,
+            ProcessingStage.OCR,
+            ProcessingStage.SPLITTING,
+            ProcessingStage.NAMING,
+        ]:
+            state.mark_running(stage)
+            state.mark_completed(stage, {})
+        state.save(batch_dir / "state.json")
+        # Create fronts.pdf so reprocess sees it
+        fronts = _make_pdf_bytes(3)
+        (batch_dir / "fronts.pdf").write_bytes(fronts)
+
+        with patch("scanbox.api.batches._run_processing", new_callable=AsyncMock):
+            resp = await client.post(f"/api/batches/{batch_id}/reprocess?start_stage=splitting")
+        assert resp.status_code == 202
+
+        # Verify splitting and naming are reset to pending
+        updated = PipelineState.load(batch_dir / "state.json")
+        assert updated.stages["interleaving"].status.value == "completed"
+        assert updated.stages["blank_removal"].status.value == "completed"
+        assert updated.stages["ocr"].status.value == "completed"
+        assert updated.stages["splitting"].status.value == "pending"
+        assert updated.stages["naming"].status.value == "pending"
+
+    async def test_reprocess_unknown_stage_returns_400(self, client):
+        batch_id, batch_dir = await _create_batch(client)
+        db = get_db()
+        await db.update_batch_state(batch_id, "review")
+        state = PipelineState.new()
+        state.save(batch_dir / "state.json")
+        fronts = _make_pdf_bytes(3)
+        (batch_dir / "fronts.pdf").write_bytes(fronts)
+
+        resp = await client.post(f"/api/batches/{batch_id}/reprocess?start_stage=nonexistent")
+        assert resp.status_code == 400
+
+    async def test_full_reprocess_preserves_user_overrides(self, client):
+        import json
+
+        batch_id, batch_dir = await _create_batch(client)
+        db = get_db()
+        await db.update_batch_state(batch_id, "review")
+        fronts = _make_pdf_bytes(3)
+        (batch_dir / "fronts.pdf").write_bytes(fronts)
+
+        # Create a user_edited document
+        await db.create_document(
+            batch_id=batch_id,
+            start_page=1,
+            end_page=2,
+            document_type="Lab Results",
+            date_of_service="2026-01-01",
+            facility="Quest",
+            provider="Dr. Smith",
+            description="CBC",
+            confidence=0.9,
+            filename="lab.pdf",
+        )
+        docs = await db.list_documents(batch_id)
+        await db.update_document(docs[0]["id"], user_edited=True)
+
+        with patch("scanbox.api.batches._run_processing", new_callable=AsyncMock):
+            resp = await client.post(f"/api/batches/{batch_id}/reprocess")
+        assert resp.status_code == 202
+
+        overrides_path = batch_dir / "user_overrides.json"
+        assert overrides_path.exists()
+        overrides = json.loads(overrides_path.read_text())
+        assert len(overrides) == 1
+        assert overrides[0]["document_type"] == "Lab Results"
+        assert overrides[0]["start_page"] == 1
+
+
 class TestExclusionEndpoints:
     async def test_exclude_page(self, client):
         batch_id, batch_dir = await _create_batch(client)

@@ -47,9 +47,9 @@ async def _run_stage(stage, ctx, state, on_progress):
     if stage == ProcessingStage.OCR:
         return await _run_ocr(ctx, on_progress)
     if stage == ProcessingStage.SPLITTING:
-        return await _run_splitting(ctx, on_progress)
+        return await _run_splitting(ctx, state, on_progress)
     if stage == ProcessingStage.NAMING:
-        return await _run_naming(ctx, on_progress)
+        return await _run_naming(ctx, state, on_progress)
     msg = f"Unknown stage: {stage}"
     raise ValueError(msg)
 
@@ -107,7 +107,7 @@ async def _run_ocr(ctx, on_progress):
     return {"ocr_complete": True}
 
 
-async def _run_splitting(ctx, on_progress):
+async def _run_splitting(ctx, state, on_progress):
     if on_progress:
         await on_progress(
             ProcessingStage.SPLITTING.value,
@@ -117,6 +117,22 @@ async def _run_splitting(ctx, on_progress):
     splits_path = ctx.batch_dir / "splits.json"
     page_texts_raw = json.loads(text_json_path.read_text())
     page_texts = {int(k): v for k, v in page_texts_raw.items()}
+
+    # Remove excluded pages before AI splitting
+    if state.excluded_pages:
+        page_texts = {k: v for k, v in page_texts.items() if k not in state.excluded_pages}
+
+    if not page_texts:
+        # All pages excluded — no documents to find
+        splits_path.write_text(json.dumps([]))
+        if on_progress:
+            await on_progress(
+                ProcessingStage.SPLITTING.value,
+                "No pages to process (all excluded)",
+                complete=True,
+            )
+        return {"document_count": 0}
+
     documents = await split_documents(page_texts, ctx.person_name)
     splits_data = [doc.model_dump() for doc in documents]
     splits_path.write_text(json.dumps(splits_data, indent=2))
@@ -127,7 +143,7 @@ async def _run_splitting(ctx, on_progress):
     return {"document_count": len(documents)}
 
 
-async def _run_naming(ctx, on_progress):
+async def _run_naming(ctx, state, on_progress):
     if on_progress:
         await on_progress(ProcessingStage.NAMING.value, "Organizing and naming your documents...")
     splits_path = ctx.batch_dir / "splits.json"
@@ -136,10 +152,34 @@ async def _run_naming(ctx, on_progress):
     docs_dir.mkdir(exist_ok=True)
     splits_data = json.loads(splits_path.read_text())
     documents = [SplitDocument(**d) for d in splits_data]
+
+    # Apply user overrides from previous processing run if present
+    overrides_path = ctx.batch_dir / "user_overrides.json"
+    if overrides_path.exists():
+        overrides = json.loads(overrides_path.read_text())
+        for doc in documents:
+            for override in overrides:
+                if (
+                    doc.start_page == override["start_page"]
+                    and doc.end_page == override["end_page"]
+                ):
+                    doc.document_type = override["document_type"]
+                    doc.date_of_service = override["date_of_service"]
+                    doc.facility = override["facility"]
+                    doc.provider = override["provider"]
+                    doc.description = override["description"]
+                    doc.user_edited = True
+                    break
+
     ocr_pdf = pikepdf.Pdf.open(ocr_path)
 
+    # Determine which document indices are active (not excluded)
+    excluded = set(state.excluded_documents)
+    active_indices = [i for i in range(len(documents)) if i not in excluded]
+
     seen_names: dict[str, int] = {}
-    for doc in documents:
+    for i in active_indices:
+        doc = documents[i]
         # Extract pages
         doc_pdf = pikepdf.Pdf.new()
         for page_num in range(doc.start_page, doc.end_page + 1):
@@ -183,12 +223,18 @@ async def _run_naming(ctx, on_progress):
         # Store filename back on the document for callers
         doc.filename = filename
 
-    # Write final documents with filenames
+    # Write ALL documents back (including excluded) so indices stay stable
     splits_data = [doc.model_dump() for doc in documents]
     splits_path.write_text(json.dumps(splits_data, indent=2))
+
+    named_count = len(active_indices)
+    excluded_count = len(documents) - named_count
     if on_progress:
-        await on_progress(ProcessingStage.NAMING.value, "All documents named", complete=True)
-    return {"documents_named": len(documents)}
+        detail = f"{named_count} documents named"
+        if excluded_count:
+            detail += f", {excluded_count} excluded"
+        await on_progress(ProcessingStage.NAMING.value, detail, complete=True)
+    return {"documents_named": named_count, "documents_excluded": excluded_count}
 
 
 async def run_pipeline(
@@ -260,5 +306,9 @@ async def run_pipeline(
     # Read back final documents list
     splits_path = ctx.batch_dir / "splits.json"
     splits_data = json.loads(splits_path.read_text())
-    documents = [SplitDocument(**d) for d in splits_data]
+    all_documents = [SplitDocument(**d) for d in splits_data]
+
+    # Filter excluded documents from the result
+    excluded = set(state.excluded_documents)
+    documents = [doc for i, doc in enumerate(all_documents) if i not in excluded]
     return PipelineResult(status="completed", documents=documents)

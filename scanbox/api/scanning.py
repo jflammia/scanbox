@@ -257,6 +257,21 @@ async def _run_processing(batch_id: str, db: Database, *, has_backs: bool) -> No
         await db.update_batch_state(batch_id, "error", error_message=result.error_message)
         await event_bus.publish(batch_id, {"type": "error", "message": result.error_message})
 
+    # Emit DLQ events for any items added during processing
+    state_path = batch_dir / "state.json"
+    if isinstance(state_path, Path) and state_path.exists():
+        final_state = PipelineState.load(state_path)
+        for dlq_item in final_state.dlq:
+            await event_bus.publish(
+                batch_id,
+                {
+                    "type": "dlq_item_added",
+                    "item_id": dlq_item.id,
+                    "stage": dlq_item.stage,
+                    "reason": dlq_item.reason,
+                },
+            )
+
 
 def _validate_pdf(data: bytes) -> None:
     """Raise ValueError if *data* is not a valid PDF."""
@@ -271,9 +286,12 @@ async def import_batch_endpoint(
     fronts: Annotated[UploadFile, File()],
     backs: Annotated[UploadFile | None, File()] = None,
     person_name: Annotated[str, Form()] = "Test Patient",
+    auto_advance_on_error: Annotated[bool, Form()] = False,
+    confidence_threshold: Annotated[float, Form()] = 0.7,
 ):
     """Import pre-made PDFs into a new batch, bypassing the scanner."""
     from scanbox.main import get_db
+    from scanbox.pipeline.state import PipelineConfig, PipelineState
 
     cfg = Config()
 
@@ -303,6 +321,14 @@ async def import_batch_endpoint(
         backs_bytes=backs_bytes,
         person_name=person_name,
     )
+
+    # Write initial pipeline state with config before triggering processing
+    pipeline_cfg = PipelineConfig(
+        auto_advance_on_error=auto_advance_on_error,
+        confidence_threshold=confidence_threshold,
+    )
+    initial_state = PipelineState.new(pipeline_cfg)
+    initial_state.save(result.batch_dir / "state.json")
 
     # Launch pipeline processing in the background
     asyncio.create_task(_run_processing(result.batch_id, db, has_backs=result.has_backs))
