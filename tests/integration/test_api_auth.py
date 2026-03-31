@@ -79,3 +79,9 @@ class TestApiKeyAuth:
         """OpenAPI docs should be accessible without auth."""
         resp = await authed_client.get("/api/openapi.json")
         assert resp.status_code == 200
+
+    async def test_scanner_icon_accessible_without_key(self, authed_client: AsyncClient):
+        """Scanner icon is loaded by <img> tags which can't send auth headers."""
+        resp = await authed_client.get("/api/scanner/icon")
+        # 404 is fine (no scanner configured in test) — just not 401
+        assert resp.status_code != 401

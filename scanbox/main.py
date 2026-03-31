@@ -57,7 +57,13 @@ app = FastAPI(
 )
 
 # Paths that bypass API key auth
-_AUTH_EXEMPT = {"/api/health", "/api/openapi.json", "/api/docs", "/api/redoc"}
+_AUTH_EXEMPT = {
+    "/api/health",
+    "/api/openapi.json",
+    "/api/docs",
+    "/api/redoc",
+    "/api/scanner/icon",
+}
 
 
 @app.middleware("http")
