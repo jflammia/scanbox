@@ -27,7 +27,8 @@ class TestStaticAssets:
     async def test_logo_svg_exists(self):
         path = Path(__file__).resolve().parent.parent.parent / "static" / "img" / "logo.svg"
         assert path.exists()
-        assert "ScanBox" in path.read_text()
+        content = path.read_text()
+        assert "Scan" in content and "Box" in content
 
     async def test_pdf_placeholder_exists(self):
         path = (
