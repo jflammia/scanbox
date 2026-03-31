@@ -133,6 +133,7 @@ Four layers, innermost to outermost:
 - Endpoints at `http://{ip}/eSCL/...` (capital S, C, L)
 - POST `/ScanJobs` → 201 with `Location` header → GET `NextDocument` in loop → 404 means ADF empty
 - No authentication. Simplex ADF only (two-pass duplex is a hardware limitation).
+- **Multi-page PDF responses:** When scan format is PDF, the scanner can return all pages in a single `NextDocument` response. Count pages from the PDF content (`len(pdf.pages)`), not from the number of HTTP responses.
 
 ### Storage
 - **Internal volume** (`/app/data`): sessions, batches, processing state — safety net
@@ -144,6 +145,14 @@ Four layers, innermost to outermost:
 - **Alpine.js 3.15** for client-side UI state (self-hosted)
 - **Tailwind CSS 4.2** via standalone CLI at Docker build time (no Node.js)
 - **jinja2-fragments** for partial template rendering on htmx requests
+- **Alpine `x-init`/`x-data` expressions** are evaluated via `new AsyncFunction(expr)`. Use `let`/`const`, not `var` — `var` throws `SyntaxError` in this context. Jinja values can be interpolated directly: `x-init="let s = '{{ batch.state }}'"`.
+- **Tailwind CSS coverage test** (`test_css_coverage.py`) checks that all classes used in templates exist in the compiled `app.css`. New Tailwind classes fail this test until the Docker build recompiles CSS. Use inline `style=""` for one-off properties (e.g., spinner border colors) rather than adding classes that aren't in the compiled CSS.
+- **`<img>` tags can't send auth headers.** Any `/api/*` endpoint loaded via `<img src="">` must be in the `_AUTH_EXEMPT` set in `main.py`, or it will 401 when `SCANBOX_API_KEY` is set. The `onerror` handler hides the broken image silently.
+
+### SSE Events
+- **Publisher is authoritative.** Event keys are defined in `scanning.py` (scan events) and `pipeline/runner.py` (pipeline events). The consumer in `views.py:_render_progress_event` must match those keys exactly.
+- **Key reference:** `scan_complete` uses `"pages"`, `done` uses `"document_count"`. If you add new event types, grep for the publish call to find the canonical key names.
+- **Events are fire-and-forget.** `EventBus` is in-memory with no persistence. If the browser disconnects, old events are lost. The scan wizard uses `x-init` state restore on page reload as the recovery mechanism.
 
 ### Dependencies
 - `litellm==1.82.6` — exact pin due to supply chain incident on 1.82.7/1.82.8
@@ -195,6 +204,9 @@ mock_pipeline.return_value = PipelineResult(status="completed", documents=[...])
 
 ### JSON key types
 `text_by_page.json` uses string keys (`"1"`, `"2"`) since JSON doesn't support integer keys. Access as `text_data["1"]`, not `text_data[1]`.
+
+### Batch state in view tests
+Results page (`/results/{batch_id}`) redirects non-terminal batches. Tests that hit `/results/` must set the batch state to `review` or `saved` first, or they'll get a 303 instead of 200.
 
 ## Documentation
 

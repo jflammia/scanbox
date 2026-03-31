@@ -80,6 +80,16 @@ Designed on 2026-03-28 by the project owner (Justin) and Claude. All three imple
 - Setup endpoints import ESCLClient, litellm, PaperlessClient inside function bodies
 - Mock patches must target the **source module**, not the endpoint module
 
+### zeroconf (mDNS)
+- `AsyncServiceBrowser` callbacks receive `Zeroconf` (sync), not `AsyncZeroconf`, as the first arg — and it's passed as a **keyword argument** (`zeroconf=...`). The handler parameter must be named `zeroconf`.
+- To use `AsyncZeroconf` for resolution inside a callback, capture it from the outer scope via closure (renamed to `azc` to avoid shadowing the keyword arg).
+- Errors inside `asyncio.run_coroutine_threadsafe()` are silently swallowed — nobody awaits the returned future. Add logging if debugging discovery issues.
+- `socket.getaddrinfo(gethostname())` is unreliable for IP detection on Linux — hostnames often resolve to `127.0.1.1`. Use UDP connect to `224.0.0.251:5353` instead to ask the OS which interface it would use for mDNS.
+
+### Network topology
+- mDNS multicast is link-local (TTL=1, doesn't cross subnets). Cross-VLAN discovery requires an mDNS reflector on the router.
+- Production: bighead (192.168.17.x) discovers the scanner (192.168.10.x) via UDM Pro mDNS reflection.
+
 ## System Dependencies
 
 | Package | apt | brew | Purpose |
