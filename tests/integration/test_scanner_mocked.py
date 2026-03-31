@@ -188,7 +188,9 @@ class TestHealthMocked:
 class TestScannerIconMocked:
     @patch("scanbox.api.scanner.ESCLClient")
     @patch("scanbox.api.scanner.httpx.AsyncClient")
-    async def test_icon_proxied_successfully(self, mock_http_cls, mock_escl_cls, client, monkeypatch):
+    async def test_icon_proxied_successfully(
+        self, mock_http_cls, mock_escl_cls, client, monkeypatch
+    ):
         monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
         mock_scanner = AsyncMock()
         mock_escl_cls.return_value = mock_scanner
@@ -259,9 +261,7 @@ class TestScannerIconMocked:
 
 class TestScannerCapabilitiesIconUrl:
     @patch("scanbox.api.scanner.ESCLClient")
-    async def test_capabilities_includes_icon_url_when_present(
-        self, mock_cls, client, monkeypatch
-    ):
+    async def test_capabilities_includes_icon_url_when_present(self, mock_cls, client, monkeypatch):
         monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
         mock_scanner = AsyncMock()
         mock_cls.return_value = mock_scanner
