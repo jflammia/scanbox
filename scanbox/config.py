@@ -53,11 +53,14 @@ class Config:
             os.getenv("PIPELINE_CONFIDENCE_THRESHOLD", "0.7")
         )
 
-        # Version: release tag when set, otherwise short git hash, otherwise "dev"
+        # Version: release tag when set, otherwise build info, otherwise "dev"
         app_version = os.getenv("APP_VERSION", "dev")
         git_commit = os.getenv("GIT_COMMIT", "unknown")
+        build_time = os.getenv("BUILD_TIME", "")
         if app_version == "dev" and git_commit not in ("unknown", ""):
             app_version = f"g{git_commit[:7]}"
+            if build_time:
+                app_version = f"{build_time} ({app_version})"
         self.APP_VERSION: str = app_version
 
         # API authentication (optional — off by default for local use)
