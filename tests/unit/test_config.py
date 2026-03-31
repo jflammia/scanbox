@@ -157,6 +157,24 @@ class TestConfigEnvOverrides:
         c = Config()
         assert c.MCP_ENABLED is False
 
+    def test_version_defaults_to_dev(self, monkeypatch):
+        monkeypatch.delenv("APP_VERSION", raising=False)
+        monkeypatch.delenv("GIT_COMMIT", raising=False)
+        c = Config()
+        assert c.APP_VERSION == "dev"
+
+    def test_version_uses_git_hash_when_dev(self, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "dev")
+        monkeypatch.setenv("GIT_COMMIT", "abc1234def5678")
+        c = Config()
+        assert c.APP_VERSION == "gabc1234"
+
+    def test_version_preserves_explicit_release(self, monkeypatch):
+        monkeypatch.setenv("APP_VERSION", "1.3.0")
+        monkeypatch.setenv("GIT_COMMIT", "abc1234def5678")
+        c = Config()
+        assert c.APP_VERSION == "1.3.0"
+
     def test_api_key_from_env(self, monkeypatch):
         monkeypatch.setenv("SCANBOX_API_KEY", "secret-key-123")
         c = Config()
