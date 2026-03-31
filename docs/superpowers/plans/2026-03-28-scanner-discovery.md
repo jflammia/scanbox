@@ -1,6 +1,6 @@
 # Scanner Discovery Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the HTTP subnet probe with proper mDNS/DNS-SD scanner discovery, add a verification checklist UX, document container networking constraints, and expose discovery via API + MCP.
 
@@ -20,7 +20,7 @@
 - Modify: `scanbox/scanner/escl.py:16-47`
 - Test: `tests/unit/test_escl.py`
 
-- [ ] **Step 1: Add zeroconf to pyproject.toml**
+- [x] **Step 1: Add zeroconf to pyproject.toml**
 
 In `pyproject.toml`, add `zeroconf` after `mcp`:
 
@@ -29,7 +29,7 @@ In `pyproject.toml`, add `zeroconf` after `mcp`:
     "zeroconf>=0.140",
 ```
 
-- [ ] **Step 2: Write failing test for icon_url in parse_capabilities**
+- [x] **Step 2: Write failing test for icon_url in parse_capabilities**
 
 In `tests/unit/test_escl.py`, add a test for parsing `IconURI`:
 
@@ -57,12 +57,12 @@ class TestParseCapabilitiesIconUrl:
         assert caps.icon_url == ""
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `pytest tests/unit/test_escl.py::TestParseCapabilitiesIconUrl -v`
 Expected: FAIL -- `ScannerCapabilities` has no `icon_url` attribute
 
-- [ ] **Step 4: Add icon_url field to ScannerCapabilities**
+- [x] **Step 4: Add icon_url field to ScannerCapabilities**
 
 In `scanbox/scanner/models.py`, add `icon_url` to the dataclass:
 
@@ -79,7 +79,7 @@ class ScannerCapabilities:
     icon_url: str = ""
 ```
 
-- [ ] **Step 5: Parse IconURI in parse_capabilities**
+- [x] **Step 5: Parse IconURI in parse_capabilities**
 
 In `scanbox/scanner/escl.py`, add after the `model_el` block (after line 22):
 
@@ -89,17 +89,17 @@ In `scanbox/scanner/escl.py`, add after the `model_el` block (after line 22):
         caps.icon_url = icon_el.text.strip()
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [x] **Step 6: Run test to verify it passes**
 
 Run: `pytest tests/unit/test_escl.py -v`
 Expected: All PASS including new icon_url tests
 
-- [ ] **Step 7: Install zeroconf**
+- [x] **Step 7: Install zeroconf**
 
 Run: `pip install -e ".[dev]"`
 Expected: zeroconf installs successfully
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add pyproject.toml scanbox/scanner/models.py scanbox/scanner/escl.py tests/unit/test_escl.py
@@ -114,7 +114,7 @@ git commit -m "feat: add zeroconf dependency and icon_url to ScannerCapabilities
 - Create: `scanbox/scanner/discovery.py`
 - Test: `tests/unit/test_discovery.py`
 
-- [ ] **Step 1: Write failing tests for discover_scanners**
+- [x] **Step 1: Write failing tests for discover_scanners**
 
 Create `tests/unit/test_discovery.py`:
 
@@ -176,12 +176,12 @@ class TestDiscoveredScannerDedup:
         assert uuids == {"uuid-1", "uuid-2"}
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_discovery.py -v`
 Expected: FAIL -- module `scanbox.scanner.discovery` not found
 
-- [ ] **Step 3: Implement the discovery module**
+- [x] **Step 3: Implement the discovery module**
 
 Create `scanbox/scanner/discovery.py`:
 
@@ -277,17 +277,17 @@ async def discover_scanners(timeout: float = 5.0) -> list[DiscoveredScanner]:
     return _dedup_scanners(found)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_discovery.py -v`
 Expected: All PASS
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 Expected: All pass, no regressions
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/scanner/discovery.py tests/unit/test_discovery.py
@@ -302,7 +302,7 @@ git commit -m "feat: add mDNS scanner discovery service"
 - Modify: `scanbox/api/scanner.py`
 - Test: `tests/integration/test_scanner_discover_api.py`
 
-- [ ] **Step 1: Write failing tests for the discover endpoint**
+- [x] **Step 1: Write failing tests for the discover endpoint**
 
 Create `tests/integration/test_scanner_discover_api.py`:
 
@@ -365,12 +365,12 @@ class TestScannerDiscoverAPI:
         mock_discover.assert_called_once_with(timeout=5.0)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_scanner_discover_api.py -v`
 Expected: FAIL -- no route for `/api/scanner/discover`
 
-- [ ] **Step 3: Implement the discover endpoint**
+- [x] **Step 3: Implement the discover endpoint**
 
 In `scanbox/api/scanner.py`, add at the end of the file:
 
@@ -404,12 +404,12 @@ async def discover(timeout: float = 5.0):
     }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/integration/test_scanner_discover_api.py -v`
 Expected: All PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scanbox/api/scanner.py tests/integration/test_scanner_discover_api.py
@@ -424,7 +424,7 @@ git commit -m "feat: add POST /api/scanner/discover endpoint"
 - Modify: `scanbox/api/setup.py`
 - Test: `tests/integration/test_verify_scanner.py`
 
-- [ ] **Step 1: Write failing tests for verify-scanner**
+- [x] **Step 1: Write failing tests for verify-scanner**
 
 Create `tests/integration/test_verify_scanner.py`:
 
@@ -493,12 +493,12 @@ class TestVerifyScanner:
         assert "Enter a scanner IP" in resp.text
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_verify_scanner.py -v`
 Expected: FAIL -- no route for `/setup/verify-scanner`
 
-- [ ] **Step 3: Replace the subnet probe and add verify-scanner**
+- [x] **Step 3: Replace the subnet probe and add verify-scanner**
 
 In `scanbox/api/setup.py`, replace the entire `discover_scanners` function (the one with subnet probing, starting with `@router.post("/setup/discover-scanners"...)`) with the new mDNS-based version, and add the verify-scanner endpoint.
 
@@ -513,12 +513,12 @@ Key details:
 - Scanner cards from discovery include the device icon from `icon_url` (falls back to printer emoji)
 - Uses `socket.create_connection` for TCP check, `ESCLClient` for eSCL checks
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/integration/test_verify_scanner.py -v`
 Expected: All PASS
 
-- [ ] **Step 5: Run full test suite, fix any broken setup wizard tests**
+- [x] **Step 5: Run full test suite, fix any broken setup wizard tests**
 
 Run: `pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 
@@ -528,7 +528,7 @@ Update any tests that reference the old subnet probe response text. The key asse
 - `"verify-scanner"` is the new endpoint to check for
 - Remove assertions about `"Connect your scanner"` if present
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/api/setup.py tests/integration/test_verify_scanner.py tests/
@@ -542,7 +542,7 @@ git commit -m "feat: add verify-scanner checklist, replace subnet probe with mDN
 **Files:**
 - Modify: `scanbox/templates/setup.html`
 
-- [ ] **Step 1: Rewrite Step 1 in setup.html**
+- [x] **Step 1: Rewrite Step 1 in setup.html**
 
 Replace the entire `{# Step 1: Scanner Check #}` div. The new version has:
 1. "Find your scanner" heading
@@ -559,7 +559,7 @@ Key htmx attributes:
 - Rescan button: `hx-post="/setup/discover-scanners"` targeting the discovery area
 - Scanner cards use `x-ref="scannerIp"` to fill the IP field and trigger form submission
 
-- [ ] **Step 2: Run setup wizard tests**
+- [x] **Step 2: Run setup wizard tests**
 
 Run: `pytest tests/e2e/test_ui_comprehensive.py::TestSetupPage -v`
 
@@ -568,7 +568,7 @@ Update `test_step1_scanner_check` assertions to match the new template content:
 - Assert `"verify-scanner"` in response
 - Assert `"discover-scanners"` in response
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scanbox/templates/setup.html tests/
@@ -582,18 +582,18 @@ git commit -m "feat: rewrite setup Step 1 with discovery cards and verify checkl
 **Files:**
 - Modify: `scanbox/templates/settings.html`
 
-- [ ] **Step 1: Update the Scanner section**
+- [x] **Step 1: Update the Scanner section**
 
 Add `x-data` wrapper and `x-ref="scannerIp"` to the scanner IP input. Add a "Rescan Network" button below the save form that calls `/setup/discover-scanners` and shows results in a `#settings-discover-result` div.
 
 The discover-scanners HTML endpoint returns cards with `@click` handlers that reference `$refs.scannerIp` -- this works because the settings section is now wrapped in `x-data`.
 
-- [ ] **Step 2: Run settings page tests**
+- [x] **Step 2: Run settings page tests**
 
 Run: `pytest tests/e2e/test_ui_comprehensive.py::TestSettingsPage -v`
 Expected: All PASS
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scanbox/templates/settings.html
@@ -607,28 +607,28 @@ git commit -m "feat: add Rescan Network button to Settings page"
 **Files:**
 - Modify: `scanbox/mcp/server.py`
 
-- [ ] **Step 1: Add scanbox_discover_scanners tool**
+- [x] **Step 1: Add scanbox_discover_scanners tool**
 
 Add a new `@mcp.tool()` function `scanbox_discover_scanners(timeout: float = 5.0)` that imports and calls `discover_scanners()` from `scanbox.scanner.discovery`, returns the same JSON shape as the REST API (`{scanners, count, hint}`).
 
-- [ ] **Step 2: Update scanbox_get_scanner_status hint**
+- [x] **Step 2: Update scanbox_get_scanner_status hint**
 
 Change the "not configured" message to: `"No scanner configured. Use scanbox_discover_scanners() to find scanners on your network, or set the IP manually via the Settings page."`
 
-- [ ] **Step 3: Update scanbox_setup_guide Step 1**
+- [x] **Step 3: Update scanbox_setup_guide Step 1**
 
 Update Step 1 description to mention `scanbox_discover_scanners()` for automatic discovery, explain the mDNS container networking constraint, and recommend manual IP for macOS/bridge setups.
 
-- [ ] **Step 4: Update scanbox_diagnose_system scanner hint**
+- [x] **Step 4: Update scanbox_diagnose_system scanner hint**
 
 Change the "not configured" issue text to mention `scanbox_discover_scanners()`.
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 Expected: All pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/mcp/server.py
@@ -644,19 +644,19 @@ git commit -m "feat: add MCP discover tool, update scanner hints"
 - Modify: `docs/api-spec.md`
 - Modify: `docs/mcp-server.md`
 
-- [ ] **Step 1: Add Scanner Discovery section to design.md**
+- [x] **Step 1: Add Scanner Discovery section to design.md**
 
 Add a "Scanner Discovery" subsection explaining mDNS/DNS-SD service types, TXT record fields, and the container networking constraint table. Include the deployment recommendation (Linux + `network_mode: host`).
 
-- [ ] **Step 2: Add discover endpoint to api-spec.md**
+- [x] **Step 2: Add discover endpoint to api-spec.md**
 
 Document `POST /api/scanner/discover` with query parameters, response examples (found and empty with hint), and container networking note.
 
-- [ ] **Step 3: Add discover tool to mcp-server.md**
+- [x] **Step 3: Add discover tool to mcp-server.md**
 
 Document `scanbox_discover_scanners` with parameters, return format, and examples (found and empty).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/design.md docs/api-spec.md docs/mcp-server.md
@@ -667,19 +667,19 @@ git commit -m "docs: add scanner discovery, container networking, and mDNS docum
 
 ### Task 9: Final cleanup, full test suite, and lint
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 Run: `pytest tests/ --ignore=tests/unit/test_fixtures.py -q`
 Expected: All pass, no regressions
 
-- [ ] **Step 2: Format and lint**
+- [x] **Step 2: Format and lint**
 
 ```bash
 ruff format scanbox/ tests/
 ruff check scanbox/ tests/
 ```
 
-- [ ] **Step 3: Commit any cleanup**
+- [x] **Step 3: Commit any cleanup**
 
 ```bash
 git add -A
@@ -690,13 +690,13 @@ git commit -m "chore: final cleanup and lint"
 
 ### Task 10: Integration test and PR
 
-- [ ] **Step 1: Rebuild Docker container**
+- [x] **Step 1: Rebuild Docker container**
 
 ```bash
 podman compose down -v && podman compose up -d --build
 ```
 
-- [ ] **Step 2: Verify the setup wizard in browser**
+- [x] **Step 2: Verify the setup wizard in browser**
 
 Navigate to http://localhost:8090/setup and confirm:
 - Spinner shows during mDNS scan
@@ -706,14 +706,14 @@ Navigate to http://localhost:8090/setup and confirm:
 - Auto-advance works on all pass
 - Retry and "Try a different scanner" buttons work on failure
 
-- [ ] **Step 3: Verify Settings page**
+- [x] **Step 3: Verify Settings page**
 
 Navigate to http://localhost:8090/settings and confirm:
 - Rescan Network button triggers discovery
 - Scanner cards appear (or hint if nothing found)
 - Clicking a card fills the IP field
 
-- [ ] **Step 4: Verify API endpoint**
+- [x] **Step 4: Verify API endpoint**
 
 ```bash
 curl -X POST http://localhost:8090/api/scanner/discover | python3 -m json.tool
@@ -721,14 +721,14 @@ curl -X POST http://localhost:8090/api/scanner/discover | python3 -m json.tool
 
 Expected: JSON with `scanners` array, `count`, and `hint` (null or the networking explanation).
 
-- [ ] **Step 5: Push and create PR**
+- [x] **Step 5: Push and create PR**
 
 ```bash
 git push -u origin <branch>
 gh pr create --title "feat: mDNS scanner discovery with verification checklist" --body "..."
 ```
 
-- [ ] **Step 6: Squash merge and cleanup**
+- [x] **Step 6: Squash merge and cleanup**
 
 ```bash
 gh pr merge <number> --squash --delete-branch

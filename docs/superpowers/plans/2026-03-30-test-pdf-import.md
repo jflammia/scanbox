@@ -1,6 +1,6 @@
 # Test PDF Import System — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Enable pre-made PDFs to enter the ScanBox pipeline without a physical scanner — via an API endpoint for interactive dev and pytest fixtures for automated/CI testing.
 
@@ -39,7 +39,7 @@
 - Create: `scanbox/api/import_batch.py`
 - Test: `tests/unit/test_import_batch.py`
 
-- [ ] **Step 1: Write failing tests for import_batch**
+- [x] **Step 1: Write failing tests for import_batch**
 
 Create `tests/unit/test_import_batch.py`:
 
@@ -142,12 +142,12 @@ class TestImportBatch:
         assert batch["backs_page_count"] == 7
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/unit/test_import_batch.py -v 2>&1 | tail -5`
 Expected: FAIL — `ImportError: cannot import name 'import_batch'`
 
-- [ ] **Step 3: Implement import_batch**
+- [x] **Step 3: Implement import_batch**
 
 Create `scanbox/api/import_batch.py`:
 
@@ -262,16 +262,16 @@ def _count_pages(pdf_bytes: bytes) -> int:
     return len(pdf.pages)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/unit/test_import_batch.py -v`
 Expected: All 8 tests PASS
 
-- [ ] **Step 5: Format and lint**
+- [x] **Step 5: Format and lint**
 
 Run: `ruff format scanbox/api/import_batch.py tests/unit/test_import_batch.py && ruff check scanbox/api/import_batch.py tests/unit/test_import_batch.py`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add scanbox/api/import_batch.py tests/unit/test_import_batch.py
@@ -286,7 +286,7 @@ git commit -m "feat: add shared import_batch function for injecting PDFs into pi
 - Modify: `scanbox/api/scanning.py`
 - Test: `tests/integration/test_import_api.py`
 
-- [ ] **Step 1: Write failing tests for the API endpoint**
+- [x] **Step 1: Write failing tests for the API endpoint**
 
 Create `tests/integration/test_import_api.py`:
 
@@ -400,12 +400,12 @@ class TestImportEndpoint:
         assert data["batch_id"] in data["status_url"]
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_import_api.py -v 2>&1 | tail -5`
 Expected: FAIL — 404 (endpoint doesn't exist yet)
 
-- [ ] **Step 3: Add the import endpoint to scanning.py**
+- [x] **Step 3: Add the import endpoint to scanning.py**
 
 Read `scanbox/api/scanning.py` first, then add the import endpoint. The scanning module doesn't currently have a router — it's called directly by other modules. We need to add a router.
 
@@ -488,7 +488,7 @@ async def import_batch_endpoint(
     }
 ```
 
-- [ ] **Step 4: Register the router in main.py**
+- [x] **Step 4: Register the router in main.py**
 
 Add to `scanbox/main.py` (in the router imports section around line 136-145):
 
@@ -502,16 +502,16 @@ And in the `app.include_router` section:
 app.include_router(scanning_router)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `pytest tests/integration/test_import_api.py -v`
 Expected: All 7 tests PASS
 
-- [ ] **Step 6: Format and lint**
+- [x] **Step 6: Format and lint**
 
 Run: `ruff format scanbox/api/scanning.py scanbox/api/import_batch.py scanbox/main.py tests/integration/test_import_api.py && ruff check scanbox/api/scanning.py scanbox/api/import_batch.py scanbox/main.py tests/integration/test_import_api.py`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add scanbox/api/scanning.py scanbox/api/import_batch.py scanbox/main.py tests/integration/test_import_api.py
@@ -526,7 +526,7 @@ git commit -m "feat: add POST /api/batches/import endpoint for PDF injection"
 - Modify: `tests/conftest.py`
 - Test: `tests/integration/test_pipeline_import.py`
 
-- [ ] **Step 1: Write integration tests that use the fixture**
+- [x] **Step 1: Write integration tests that use the fixture**
 
 Create `tests/integration/test_pipeline_import.py`:
 
@@ -595,12 +595,12 @@ class TestLoadTestPile:
         assert ctx.output_dir.exists()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_pipeline_import.py -v 2>&1 | tail -5`
 Expected: FAIL — `load_test_pile` fixture not found
 
-- [ ] **Step 3: Add load_test_pile fixture to conftest.py**
+- [x] **Step 3: Add load_test_pile fixture to conftest.py**
 
 Add to `tests/conftest.py`:
 
@@ -682,16 +682,16 @@ def load_test_pile(tmp_path, db):
     return _load
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/integration/test_pipeline_import.py -v`
 Expected: All 9 tests PASS
 
-- [ ] **Step 5: Format and lint**
+- [x] **Step 5: Format and lint**
 
 Run: `ruff format tests/conftest.py tests/integration/test_pipeline_import.py && ruff check tests/conftest.py tests/integration/test_pipeline_import.py`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/conftest.py tests/integration/test_pipeline_import.py
@@ -706,7 +706,7 @@ git commit -m "feat: add load_test_pile pytest fixture for pipeline integration 
 - Modify: `tests/conftest.py`
 - Test: `tests/integration/test_pipeline_import.py`
 
-- [ ] **Step 1: Write tests for stage-level fixtures**
+- [x] **Step 1: Write tests for stage-level fixtures**
 
 Add to `tests/integration/test_pipeline_import.py`:
 
@@ -726,12 +726,12 @@ class TestStageFixtures:
         assert (ctx.batch_dir / "text_by_page.json").exists()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/integration/test_pipeline_import.py::TestStageFixtures -v 2>&1 | tail -5`
 Expected: FAIL — fixtures not found
 
-- [ ] **Step 3: Add stage-level fixtures to conftest.py**
+- [x] **Step 3: Add stage-level fixtures to conftest.py**
 
 Add to `tests/conftest.py` after the `load_test_pile` fixture:
 
@@ -795,7 +795,7 @@ async def ocr_complete_batch(load_test_pile):
 
 Note: The `interleave_pages`, `remove_blank_pages`, and `run_ocr` function signatures should be verified by reading the source files before implementing. The signatures shown above follow the patterns from the pipeline runner. Adjust if the actual signatures differ.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/integration/test_pipeline_import.py::TestStageFixtures -v`
 Expected: All 3 tests PASS (requires tesseract installed for OCR test)
@@ -808,11 +808,11 @@ pytestmark = pytest.mark.skipif(
 )
 ```
 
-- [ ] **Step 5: Format and lint**
+- [x] **Step 5: Format and lint**
 
 Run: `ruff format tests/conftest.py tests/integration/test_pipeline_import.py && ruff check tests/conftest.py tests/integration/test_pipeline_import.py`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/conftest.py tests/integration/test_pipeline_import.py
@@ -823,21 +823,21 @@ git commit -m "feat: add stage-level fixtures (interleaved, blanks_removed, ocr_
 
 ## Task 5: Run full test suite and verify
 
-- [ ] **Step 1: Format all new/modified code**
+- [x] **Step 1: Format all new/modified code**
 
 Run: `ruff format scanbox/api/import_batch.py scanbox/api/scanning.py scanbox/main.py tests/conftest.py tests/unit/test_import_batch.py tests/integration/test_import_api.py tests/integration/test_pipeline_import.py`
 
-- [ ] **Step 2: Lint all new/modified code**
+- [x] **Step 2: Lint all new/modified code**
 
 Run: `ruff check scanbox/api/import_batch.py scanbox/api/scanning.py scanbox/main.py tests/conftest.py tests/unit/test_import_batch.py tests/integration/test_import_api.py tests/integration/test_pipeline_import.py`
 Expected: No errors
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `pytest -v`
 Expected: All existing tests still pass + new tests pass
 
-- [ ] **Step 4: Test the API endpoint manually**
+- [x] **Step 4: Test the API endpoint manually**
 
 ```bash
 # Generate a test pile
@@ -847,7 +847,7 @@ Expected: All existing tests still pass + new tests pass
 # Or test via pytest — already covered in test_import_api.py
 ```
 
-- [ ] **Step 5: Commit if any fixes were needed**
+- [x] **Step 5: Commit if any fixes were needed**
 
 ```bash
 git add -A
