@@ -1,5 +1,7 @@
 """Web UI routes serving HTML templates."""
 
+import contextlib
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
@@ -41,6 +43,7 @@ async def home(request: Request):
             }
         )
 
+    cfg = Config()
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -48,6 +51,7 @@ async def home(request: Request):
             "persons": persons,
             "sessions": enriched_sessions,
             "setup_completed": setup_data.get("completed", False),
+            "scanner_configured": bool(cfg.SCANNER_IP),
         },
     )
 
@@ -347,27 +351,37 @@ async def scanner_status():
     cfg = Config()
     if not cfg.SCANNER_IP:
         return HTMLResponse(
+            '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
+            'hover:text-text-secondary">'
             '<span class="inline-block w-3 h-3 rounded-full bg-gray-300"></span>'
-            " <span>No scanner configured</span>"
+            " <span>No scanner &mdash; set one up</span>"
+            "</a>"
         )
 
+    from scanbox.scanner.escl import ESCLClient
+
+    client = ESCLClient(cfg.SCANNER_IP)
     try:
-        import httpx
-
-        async with httpx.AsyncClient(timeout=3.0) as http:
-            resp = await http.get(f"http://{cfg.SCANNER_IP}/eSCL/ScannerStatus")
-            if resp.status_code == 200:
-                return HTMLResponse(
-                    '<span class="inline-block w-3 h-3 rounded-full bg-status-success">'
-                    f"</span> Scanner ready ({cfg.SCANNER_IP})"
-                )
+        await client.get_status()
+        caps = await client.get_capabilities()
+        model = caps.make_and_model or cfg.SCANNER_IP
+        return HTMLResponse(
+            '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
+            'hover:text-text-secondary">'
+            '<span class="inline-block w-3 h-3 rounded-full bg-status-success"></span>'
+            f" <span>{model}</span>"
+            "</a>"
+        )
     except Exception:
-        pass
-
-    return HTMLResponse(
-        '<span class="inline-block w-3 h-3 rounded-full bg-status-error"></span>'
-        f" Can't reach scanner ({cfg.SCANNER_IP})"
-    )
+        return HTMLResponse(
+            '<a href="/scanner" class="flex items-center gap-2 no-underline text-text-muted '
+            'hover:text-text-secondary">'
+            '<span class="inline-block w-3 h-3 rounded-full bg-status-error"></span>'
+            f" <span>Can't reach scanner ({cfg.SCANNER_IP})</span>"
+            "</a>"
+        )
+    finally:
+        await client.close()
 
 
 @router.get("/settings")
@@ -386,14 +400,9 @@ async def settings(request: Request):
 @router.post("/settings/scanner", response_class=HTMLResponse)
 async def settings_scanner(scanner_ip: str = Form("")):
     """Save scanner IP from the Settings page."""
-    import json
-
     cfg = Config()
     runtime_path = cfg.config_dir / "runtime.json"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Read existing runtime config, update scanner_ip
-    import contextlib
 
     data = {}
     if runtime_path.exists():
@@ -405,6 +414,148 @@ async def settings_scanner(scanner_ip: str = Form("")):
     if scanner_ip.strip():
         return HTMLResponse('<p class="text-status-success font-medium mt-2">Scanner IP saved.</p>')
     return HTMLResponse('<p class="text-text-muted font-medium mt-2">Scanner IP cleared.</p>')
+
+
+@router.get("/scanner")
+async def scanner_page(request: Request):
+    """Dedicated scanner configuration page."""
+    cfg = Config()
+    return templates.TemplateResponse(request, "scanner.html", {"scanner_ip": cfg.SCANNER_IP})
+
+
+@router.get("/scanner/status-card", response_class=HTMLResponse)
+async def scanner_status_card():
+    """Rich status card partial for the scanner page."""
+    cfg = Config()
+    if not cfg.SCANNER_IP:
+        return HTMLResponse(
+            '<div class="flex items-center gap-4">'
+            '<span class="w-4 h-4 rounded-full bg-gray-300 flex-shrink-0"></span>'
+            "<div>"
+            '<p class="font-medium">No scanner configured</p>'
+            '<p class="text-sm text-text-muted">'
+            "Enter an IP address below or scan your network to find scanners.</p>"
+            "</div>"
+            "</div>"
+        )
+
+    from scanbox.scanner.escl import ESCLClient
+
+    client = ESCLClient(cfg.SCANNER_IP)
+    try:
+        status = await client.get_status()
+        caps = await client.get_capabilities()
+        model = caps.make_and_model or "Scanner"
+        adf_text = "Paper loaded" if status.adf_loaded else "Empty"
+        resolutions = ", ".join(f"{r} DPI" for r in caps.supported_resolutions) or "Unknown"
+        return HTMLResponse(
+            '<div class="flex items-center gap-4">'
+            '<span class="w-4 h-4 rounded-full bg-status-success flex-shrink-0"></span>'
+            "<div>"
+            f'<p class="font-semibold">{model}</p>'
+            f'<p class="text-sm text-text-secondary">{cfg.SCANNER_IP}</p>'
+            f'<p class="text-sm text-text-muted">Document feeder: {adf_text}</p>'
+            f'<p class="text-sm text-text-muted">Resolutions: {resolutions}</p>'
+            "</div>"
+            "</div>"
+        )
+    except Exception:
+        return HTMLResponse(
+            '<div class="flex items-center gap-4">'
+            '<span class="w-4 h-4 rounded-full bg-status-error flex-shrink-0"></span>'
+            "<div>"
+            f'<p class="font-medium">Can\'t reach scanner</p>'
+            f'<p class="text-sm text-text-secondary">{cfg.SCANNER_IP}</p>'
+            '<p class="text-sm text-text-muted">'
+            "Check that the scanner is on and connected to your network.</p>"
+            "</div>"
+            "</div>"
+        )
+    finally:
+        await client.close()
+
+
+@router.post("/scanner/set-ip", response_class=HTMLResponse)
+async def set_scanner_ip(request: Request):
+    """Save a scanner IP and test the connection."""
+    form = await request.form()
+    scanner_ip = str(form.get("scanner_ip", "")).strip()
+
+    if not scanner_ip:
+        return HTMLResponse(
+            '<p class="text-status-warning font-medium">Enter a scanner IP address.</p>'
+        )
+
+    # Save to runtime config
+    cfg = Config()
+    runtime_path = cfg.config_dir / "runtime.json"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+    data = {}
+    if runtime_path.exists():
+        with contextlib.suppress(json.JSONDecodeError, OSError):
+            data = json.loads(runtime_path.read_text())
+    data["scanner_ip"] = scanner_ip
+    runtime_path.write_text(json.dumps(data))
+
+    # Test connection
+    from scanbox.scanner.escl import ESCLClient
+
+    client = ESCLClient(scanner_ip)
+    try:
+        caps = await client.get_capabilities()
+        model = caps.make_and_model or "Scanner"
+        return HTMLResponse(
+            f'<p class="text-status-success font-medium">Connected to {model} at {scanner_ip}</p>'
+        )
+    except Exception:
+        return HTMLResponse(
+            f'<p class="text-status-warning font-medium">'
+            f"Saved {scanner_ip} but can't reach it yet. Is the scanner on?</p>"
+        )
+    finally:
+        await client.close()
+
+
+@router.post("/scanner/discover", response_class=HTMLResponse)
+async def discover_scanners_html():
+    """Discover scanners on the network and return HTML cards."""
+    from scanbox.scanner.discovery import DISCOVERY_HINT, discover_scanners
+
+    scanners = await discover_scanners(timeout=5.0)
+    if not scanners:
+        return HTMLResponse(
+            '<p class="text-text-muted text-sm py-2">No scanners found on your network.</p>'
+            '<p class="text-text-muted text-xs">'
+            f"{DISCOVERY_HINT}</p>"
+        )
+
+    cards = ""
+    for s in scanners:
+        icon_html = (
+            f'<img src="{s.icon_url}" alt="" class="w-10 h-10 object-cover rounded">'
+            if s.icon_url
+            else '<div class="text-3xl">&#128424;</div>'
+        )
+        cards += (
+            f'<form class="inline" hx-post="/scanner/set-ip" hx-target="#scanner-set-result" '
+            f'hx-swap="innerHTML">'
+            f'<input type="hidden" name="scanner_ip" value="{s.ip}">'
+            f'<button type="submit" '
+            f'class="w-full text-left border border-border rounded-lg p-4 '
+            f"flex items-center gap-4 "
+            f'hover:border-brand-400 hover:bg-brand-50 transition-colors cursor-pointer">'
+            f"{icon_html}"
+            f'<div class="flex-1"><p class="font-semibold">{s.model}</p>'
+            f'<p class="text-sm text-text-secondary">{s.ip}</p></div>'
+            f'<span class="text-sm text-brand-600 font-medium">Use this scanner</span>'
+            f"</button>"
+            f"</form>"
+        )
+    return HTMLResponse(
+        f'<div class="space-y-2">'
+        f'<p class="text-status-success font-medium">Found {len(scanners)} scanner(s)</p>'
+        f"{cards}</div>"
+    )
 
 
 _SPINNER = (

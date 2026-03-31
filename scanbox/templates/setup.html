@@ -23,7 +23,8 @@
     <div id="scanner-discover-result"
          hx-post="/setup/discover-scanners"
          hx-trigger="load"
-         hx-swap="innerHTML">
+         hx-swap="innerHTML"
+         hx-indicator="#setup-discover-spinner">
       <div class="flex justify-center gap-2 items-center text-text-muted">
         <div class="w-5 h-5 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></div>
         Scanning your network...
@@ -34,8 +35,12 @@
             hx-post="/setup/discover-scanners"
             hx-target="#scanner-discover-result"
             hx-swap="innerHTML"
-            class="text-sm text-brand-600 hover:text-brand-700 no-underline cursor-pointer">
+            hx-indicator="#setup-discover-spinner"
+            class="text-sm text-brand-600 hover:text-brand-700 no-underline cursor-pointer inline-flex items-center gap-2">
       Rescan Network
+      <span id="setup-discover-spinner" class="htmx-indicator">
+        <span class="inline-block w-4 h-4 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></span>
+      </span>
     </button>
 
     {# Manual entry + verify form #}
@@ -43,14 +48,18 @@
           hx-post="/setup/verify-scanner"
           hx-target="#scanner-verify-result"
           hx-swap="innerHTML"
+          hx-indicator="#setup-verify-spinner"
           class="space-y-3">
       <label class="block text-sm text-text-secondary text-left">Or enter an IP address</label>
       <div class="flex gap-2">
         <input type="text" name="scanner_ip" x-ref="scannerIp" placeholder="e.g. 192.168.1.100"
                class="flex-1 border border-border rounded-md px-4 py-3 text-base bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
         <button type="submit"
-                class="px-6 py-3 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors">
+                class="px-6 py-3 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors inline-flex items-center gap-2">
           Verify
+          <span id="setup-verify-spinner" class="htmx-indicator">
+            <span class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          </span>
         </button>
       </div>
       <div id="scanner-verify-result"></div>
@@ -67,26 +76,35 @@
     <div class="text-5xl">&#128193;</div>
     <h2 class="text-xl font-semibold">Checking storage...</h2>
     <p class="text-text-secondary">Making sure we can save your files.</p>
-    <button @click="step = 3"
-            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
-      Continue
-    </button>
+    <div class="flex justify-center gap-4">
+      <button @click="step = 1"
+              class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+        &larr; Back
+      </button>
+      <button @click="step = 3"
+              class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+        Continue
+      </button>
+    </div>
   </div>
 
   {# Step 3: AI Setup #}
   <div x-show="step === 3" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
     <div class="text-5xl">&#129302;</div>
     <h2 class="text-xl font-semibold">AI document analysis</h2>
-    <p class="text-text-secondary">Which AI service would you like to use for document analysis?</p>
-    <select class="w-full border border-border rounded-md px-4 py-3 text-base bg-white">
-      <option value="anthropic">Anthropic (Claude)</option>
-      <option value="openai">OpenAI (GPT)</option>
-      <option value="ollama">Ollama (local)</option>
-    </select>
-    <button @click="step = 4"
-            class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
-      Continue
-    </button>
+    <p class="text-text-secondary">ScanBox uses an AI service to identify and name your documents.
+      This is configured via environment variables (LLM_PROVIDER, API keys).
+      See Settings for details.</p>
+    <div class="flex justify-center gap-4">
+      <button @click="step = 2"
+              class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+        &larr; Back
+      </button>
+      <button @click="step = 4"
+              class="bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
+        Continue
+      </button>
+    </div>
   </div>
 
   {# Step 4: PaperlessNGX (optional) #}
@@ -94,6 +112,10 @@
     <div class="text-5xl">&#128196;</div>
     <h2 class="text-xl font-semibold">Do you use PaperlessNGX?</h2>
     <p class="text-text-secondary">Optional integration for document management.</p>
+    <button @click="step = 3"
+            class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+      &larr; Back
+    </button>
     <div class="flex justify-center gap-4">
       <button @click="step = 5"
               class="bg-brand-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors">
@@ -111,6 +133,10 @@
     <div class="text-5xl">&#128100;</div>
     <h2 class="text-xl font-semibold">Who are these documents for?</h2>
     <p class="text-text-secondary">Enter the name of the person you'll be scanning records for.</p>
+    <button @click="step = 4"
+            class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+      &larr; Back
+    </button>
     <form hx-post="/setup/add-person" hx-target="#person-result" hx-swap="innerHTML"
           @htmx:after-request.camel="setTimeout(() => step = 6, 800)">
       <input type="text" name="person_name" placeholder="e.g. John Doe" required
@@ -125,14 +151,26 @@
 
   {# Step 6: Done #}
   <div x-show="step === 6" x-transition class="bg-surface-raised border border-border rounded-lg p-8 space-y-4">
+    <button @click="step = 5"
+            class="text-sm text-text-muted hover:text-text-secondary no-underline cursor-pointer">
+      &larr; Back
+    </button>
     <div class="text-5xl">&#9989;</div>
     <h2 class="text-xl font-semibold">You're ready to scan!</h2>
+    {% if scanner_configured %}
     <p class="text-text-secondary">Everything is set up. Start your first scanning session.</p>
+    {% else %}
+    <p class="text-text-secondary">Setup is complete.</p>
+    <p class="text-status-warning text-sm">
+      No scanner configured yet &mdash; you can still browse and import documents.
+      <a href="/scanner" class="text-brand-600 underline">Set up a scanner</a>
+    </p>
+    {% endif %}
     <a href="/"
        hx-post="/api/setup/complete"
        hx-swap="none"
        class="inline-block bg-brand-600 text-white text-lg px-8 py-4 min-h-14 rounded-lg font-semibold hover:bg-brand-700 transition-colors no-underline">
-      Start Scanning
+      {% if scanner_configured %}Start Scanning{% else %}Go to Home{% endif %}
     </a>
   </div>
 
