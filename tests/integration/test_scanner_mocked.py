@@ -8,6 +8,10 @@ from httpx import ASGITransport, AsyncClient
 from scanbox.main import app
 from scanbox.scanner.models import ScannerCapabilities, ScannerStatus
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def client(tmp_path, monkeypatch):
@@ -179,3 +183,109 @@ class TestHealthMocked:
         resp = await client.get("/api/health")
         data = resp.json()
         assert data["scanner"] == "unreachable"
+
+
+class TestScannerIconMocked:
+    @patch("scanbox.api.scanner.ESCLClient")
+    @patch("scanbox.api.scanner.httpx.AsyncClient")
+    async def test_icon_proxied_successfully(
+        self, mock_http_cls, mock_escl_cls, client, monkeypatch
+    ):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_escl_cls.return_value = mock_scanner
+        mock_scanner.get_capabilities.return_value = ScannerCapabilities(
+            make_and_model="HP LaserJet",
+            icon_url="http://NPI8C2A8F.local./ipp/images/printer.png",
+        )
+
+        mock_http = AsyncMock()
+        mock_http_cls.return_value.__aenter__.return_value = mock_http
+        mock_http_cls.return_value.__aexit__.return_value = None
+        icon_bytes = b"\x89PNG\r\n\x1a\n"  # minimal PNG header
+        mock_http_resp = MagicMock()
+        mock_http_resp.status_code = 200
+        mock_http_resp.content = icon_bytes
+        mock_http_resp.headers = {"content-type": "image/png"}
+        mock_http.get.return_value = mock_http_resp
+
+        resp = await client.get("/api/scanner/icon")
+        assert resp.status_code == 200
+        assert resp.content == icon_bytes
+        assert resp.headers["content-type"] == "image/png"
+        # Verify the IP was used instead of the mDNS hostname
+        mock_http.get.assert_called_once_with("http://192.168.1.100/ipp/images/printer.png")
+
+    @patch("scanbox.api.scanner.ESCLClient")
+    async def test_icon_no_scanner_configured(self, mock_escl_cls, client, monkeypatch):
+        monkeypatch.setenv("SCANNER_IP", "")
+        resp = await client.get("/api/scanner/icon")
+        assert resp.status_code == 404
+
+    @patch("scanbox.api.scanner.ESCLClient")
+    async def test_icon_no_icon_url(self, mock_escl_cls, client, monkeypatch):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_escl_cls.return_value = mock_scanner
+        mock_scanner.get_capabilities.return_value = ScannerCapabilities(
+            make_and_model="HP LaserJet",
+            icon_url="",
+        )
+
+        resp = await client.get("/api/scanner/icon")
+        assert resp.status_code == 404
+
+    @patch("scanbox.api.scanner.ESCLClient")
+    @patch("scanbox.api.scanner.httpx.AsyncClient")
+    async def test_icon_upstream_fetch_fails(
+        self, mock_http_cls, mock_escl_cls, client, monkeypatch
+    ):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_escl_cls.return_value = mock_scanner
+        mock_scanner.get_capabilities.return_value = ScannerCapabilities(
+            make_and_model="HP LaserJet",
+            icon_url="http://NPI8C2A8F.local./ipp/images/printer.png",
+        )
+
+        mock_http = AsyncMock()
+        mock_http_cls.return_value.__aenter__.return_value = mock_http
+        mock_http_cls.return_value.__aexit__.return_value = None
+        mock_http_resp = MagicMock()
+        mock_http_resp.status_code = 503
+        mock_http.get.return_value = mock_http_resp
+
+        resp = await client.get("/api/scanner/icon")
+        assert resp.status_code == 404
+
+
+class TestScannerCapabilitiesIconUrl:
+    @patch("scanbox.api.scanner.ESCLClient")
+    async def test_capabilities_includes_icon_url_when_present(self, mock_cls, client, monkeypatch):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_cls.return_value = mock_scanner
+        mock_scanner.get_capabilities.return_value = ScannerCapabilities(
+            make_and_model="HP LaserJet",
+            icon_url="http://NPI8C2A8F.local./ipp/images/printer.png",
+        )
+
+        resp = await client.get("/api/scanner/capabilities")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["icon_url"] == "/api/scanner/icon"
+
+    @patch("scanbox.api.scanner.ESCLClient")
+    async def test_capabilities_icon_url_none_when_absent(self, mock_cls, client, monkeypatch):
+        monkeypatch.setenv("SCANNER_IP", "192.168.1.100")
+        mock_scanner = AsyncMock()
+        mock_cls.return_value = mock_scanner
+        mock_scanner.get_capabilities.return_value = ScannerCapabilities(
+            make_and_model="HP LaserJet",
+            icon_url="",
+        )
+
+        resp = await client.get("/api/scanner/capabilities")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["icon_url"] is None

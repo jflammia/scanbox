@@ -458,15 +458,18 @@ async def scanner_status_card():
         caps = await client.get_capabilities()
         model = caps.make_and_model or "Scanner"
         adf_text = "Paper loaded" if status.adf_loaded else "Empty"
-        resolutions = ", ".join(f"{r} DPI" for r in caps.supported_resolutions) or "Unknown"
         return HTMLResponse(
             '<div class="flex items-center gap-4">'
-            '<span class="w-4 h-4 rounded-full bg-status-success flex-shrink-0"></span>'
+            '<img src="/api/scanner/icon" alt="" class="w-16 h-16 object-contain rounded"'
+            " onerror=\"this.style.display='none'\">"
             "<div>"
-            f'<p class="font-semibold">{model}</p>'
+            '<div class="flex items-center gap-2">'
+            '<span class="w-3 h-3 rounded-full bg-status-success flex-shrink-0"></span>'
+            '<span class="font-medium">Connected</span>'
+            "</div>"
+            f'<p class="text-lg font-semibold">{model}</p>'
             f'<p class="text-sm text-text-secondary">{cfg.SCANNER_IP}</p>'
             f'<p class="text-sm text-text-muted">Document feeder: {adf_text}</p>'
-            f'<p class="text-sm text-text-muted">Resolutions: {resolutions}</p>'
             "</div>"
             "</div>"
         )
@@ -555,11 +558,17 @@ async def discover_scanners_html():
 
     cards = ""
     for s in scanners:
-        icon_html = (
-            f'<img src="{s.icon_url}" alt="" class="w-10 h-10 object-cover rounded">'
-            if s.icon_url
-            else '<div class="text-3xl">&#128424;</div>'
-        )
+        if s.icon_url:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(s.icon_url)
+            icon_direct = f"http://{s.ip}{parsed.path}"
+            icon_html = (
+                f'<img src="{icon_direct}" alt="" class="w-12 h-12 object-contain rounded"'
+                f" onerror=\"this.parentElement.innerHTML='&#128424;'\">"
+            )
+        else:
+            icon_html = '<div class="text-3xl">&#128424;</div>'
         cards += (
             f'<form class="inline" hx-post="/scanner/set-ip" hx-target="#scanner-set-result" '
             f'hx-swap="innerHTML">'
