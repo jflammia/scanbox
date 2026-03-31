@@ -52,9 +52,15 @@ After each change:
 
 1. `ruff format scanbox/ tests/`
 2. `ruff check scanbox/ tests/`
-3. `pytest` (all 532 tests pass)
-4. Commit with conventional message
-5. Push to feature branch
+3. `pytest` (full test suite)
+4. **Verify locally beyond tests.** Run the actual code path to confirm the fix works:
+   - Config/API changes: call the function or endpoint directly in a Python script
+   - Template/frontend changes: render the template and verify the HTML output
+   - Browser behavior (Alpine, htmx, SSE): check generated JS is syntactically valid
+   - Pipeline changes: trace the data flow through the affected functions
+   - CI passing alone is NOT sufficient — tests can pass while the real code path fails (e.g., wrong keyword arg names, type mismatches hidden by mocks)
+5. Commit with conventional message
+6. Push to feature branch
 
 ## Key Files
 

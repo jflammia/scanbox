@@ -90,11 +90,12 @@ Non-negotiable. Follow even when not asked:
 3. **Format before commit.** `ruff format` — the pre-commit hook enforces this.
 4. **Verify CI after push.** If red, fix immediately.
 5. **TDD.** Write failing tests first, then implement.
-6. **Design spec is authoritative.** `docs/design.md` is the single source of truth.
-7. **Plain English for users.** Never show technical jargon in the UI.
-8. **Minimal changes.** Don't refactor, add docstrings, or "improve" code beyond the task.
-9. **No speculative abstractions.** Build what's needed now, not what might be needed later.
-10. **Never block the UI on backend work.** Show what's available now, stream updates as they arrive. Scanning, OCR, splitting, and naming are async — the user should always see immediate feedback (page count, thumbnails, progress) without waiting for processing to finish. If a backend job fails, the user still sees what was captured.
+6. **Verify locally before merging.** Run the actual code path — not just unit tests — to confirm the fix works. For frontend: render the template and check the output. For API changes: call the endpoint. For browser behavior (Alpine, htmx, SSE): test in a real browser or verify the generated JS/HTML is valid. CI passing is necessary but not sufficient.
+7. **Design spec is authoritative.** `docs/design.md` is the single source of truth.
+8. **Plain English for users.** Never show technical jargon in the UI.
+9. **Minimal changes.** Don't refactor, add docstrings, or "improve" code beyond the task.
+10. **No speculative abstractions.** Build what's needed now, not what might be needed later.
+11. **Never block the UI on backend work.** Show what's available now, stream updates as they arrive. Scanning, OCR, splitting, and naming are async — the user should always see immediate feedback (page count, thumbnails, progress) without waiting for processing to finish. If a backend job fails, the user still sees what was captured.
 
 ## Git Workflow
 
