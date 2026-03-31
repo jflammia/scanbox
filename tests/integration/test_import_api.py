@@ -1,12 +1,15 @@
 """Tests for POST /api/batches/import endpoint."""
 
 from io import BytesIO
+from unittest.mock import AsyncMock, patch
 
 import pikepdf
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from scanbox.main import app
+from scanbox.config import Config
+from scanbox.main import app, get_db
+from scanbox.pipeline.state import PipelineState
 
 
 def _make_pdf_bytes(num_pages: int = 3) -> bytes:
@@ -87,3 +90,51 @@ class TestImportEndpoint:
         data = resp.json()
         assert "status_url" in data
         assert data["batch_id"] in data["status_url"]
+
+
+class TestImportWithConfig:
+    async def test_import_with_pipeline_config(self, client):
+        fronts = _make_pdf_bytes(3)
+        with patch("scanbox.api.scanning._run_processing", new_callable=AsyncMock):
+            resp = await client.post(
+                "/api/batches/import",
+                files={"fronts": ("fronts.pdf", fronts, "application/pdf")},
+                data={
+                    "person_name": "Test",
+                    "auto_advance_on_error": "true",
+                    "confidence_threshold": "0.5",
+                },
+            )
+        assert resp.status_code == 201
+        batch_id = resp.json()["batch_id"]
+
+        # Verify config was written to state.json synchronously before background task
+        db = get_db()
+        batch = await db.get_batch(batch_id)
+        session = await db.get_session(batch["session_id"])
+        cfg = Config()
+        batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+        state = PipelineState.load(batch_dir / "state.json")
+        assert state.config.auto_advance_on_error is True
+        assert state.config.confidence_threshold == 0.5
+
+    async def test_import_default_pipeline_config(self, client):
+        fronts = _make_pdf_bytes(2)
+        with patch("scanbox.api.scanning._run_processing", new_callable=AsyncMock):
+            resp = await client.post(
+                "/api/batches/import",
+                files={"fronts": ("fronts.pdf", fronts, "application/pdf")},
+            )
+        assert resp.status_code == 201
+        batch_id = resp.json()["batch_id"]
+
+        db = get_db()
+        batch = await db.get_batch(batch_id)
+        session = await db.get_session(batch["session_id"])
+        cfg = Config()
+        batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+        state = PipelineState.load(batch_dir / "state.json")
+        assert state.config.auto_advance_on_error is False
+        assert state.config.confidence_threshold == 0.7
