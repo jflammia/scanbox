@@ -388,6 +388,7 @@ async def settings(request: Request):
         {
             "scanner_ip": cfg.SCANNER_IP,
             "paperless_url": cfg.PAPERLESS_URL,
+            "app_version": cfg.APP_VERSION,
         },
     )
 
