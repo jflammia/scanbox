@@ -94,6 +94,7 @@ Non-negotiable. Follow even when not asked:
 7. **Plain English for users.** Never show technical jargon in the UI.
 8. **Minimal changes.** Don't refactor, add docstrings, or "improve" code beyond the task.
 9. **No speculative abstractions.** Build what's needed now, not what might be needed later.
+10. **Never block the UI on backend work.** Show what's available now, stream updates as they arrive. Scanning, OCR, splitting, and naming are async — the user should always see immediate feedback (page count, thumbnails, progress) without waiting for processing to finish. If a backend job fails, the user still sees what was captured.
 
 ## Git Workflow
 
