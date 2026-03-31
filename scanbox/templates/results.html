@@ -47,8 +47,12 @@
   {% block cards %}
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {% for doc in documents %}
+    {% set doc_index = loop.index0 %}
+    {% set is_excluded = doc_index in excluded_documents %}
     <article id="doc-{{ doc.id }}"
-             class="bg-surface-raised border rounded-lg overflow-hidden hover:shadow-md transition-shadow {{ 'border-status-warning border-2' if doc.confidence < 0.7 else 'border-border' }}">
+             x-data="{ excluded: {{ 'true' if is_excluded else 'false' }} }"
+             :class="{ 'opacity-40': excluded }"
+             class="bg-surface-raised border rounded-lg overflow-hidden hover:shadow-md transition-all {{ 'border-status-warning border-2' if doc.confidence < 0.7 else 'border-border' }}">
       <div class="aspect-[3/4] bg-gray-100 flex items-center justify-center text-text-muted relative">
         <span class="text-4xl">&#128196;</span>
         {% if doc.confidence < 0.7 %}
@@ -56,7 +60,7 @@
         {% endif %}
       </div>
       <div class="p-4 space-y-1">
-        <h3 class="text-lg font-semibold">{{ doc.document_type }}</h3>
+        <h3 class="text-lg font-semibold" :class="{ 'line-through': excluded }">{{ doc.document_type }}</h3>
         <p class="text-sm {% if doc.date_of_service == 'unknown' %}text-status-warning{% else %}text-text-secondary{% endif %}">
           {{ doc.date_of_service if doc.date_of_service != 'unknown' else 'Date unknown' }}
         </p>
@@ -70,12 +74,25 @@
         <p class="text-xs text-brand-600">Edited by you</p>
         {% endif %}
         <div class="flex gap-2 pt-2">
-          <button class="text-sm px-4 py-2 min-h-10 rounded-md {{ 'bg-status-warning text-white hover:bg-amber-600' if doc.confidence < 0.7 else 'bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50' }} transition-colors"
+          <button x-show="!excluded"
+                  class="text-sm px-4 py-2 min-h-10 rounded-md {{ 'bg-status-warning text-white hover:bg-amber-600' if doc.confidence < 0.7 else 'bg-white text-brand-600 border-2 border-brand-200 hover:border-brand-400 hover:bg-brand-50' }} transition-colors"
                   hx-get="/documents/{{ doc.id }}/edit"
                   hx-target="#doc-{{ doc.id }}"
                   hx-swap="outerHTML">
             {{ "Fix This" if doc.confidence < 0.7 else "Edit" }}
           </button>
+          {% if batch %}
+          <button x-show="!excluded"
+                  @click="fetch('/api/batches/{{ batch.id }}/exclude/document/{{ doc_index }}', { method: 'POST' }).then(() => { excluded = true })"
+                  class="text-sm px-4 py-2 min-h-10 rounded-md text-text-muted hover:text-status-error hover:bg-red-50 border border-border transition-colors">
+            Exclude
+          </button>
+          <button x-show="excluded" x-cloak
+                  @click="fetch('/api/batches/{{ batch.id }}/exclude/document/{{ doc_index }}', { method: 'DELETE' }).then(() => { excluded = false })"
+                  class="text-sm px-4 py-2 min-h-10 rounded-md text-brand-600 hover:text-brand-700 hover:bg-brand-50 border border-brand-200 transition-colors">
+            Include
+          </button>
+          {% endif %}
         </div>
       </div>
     </article>
