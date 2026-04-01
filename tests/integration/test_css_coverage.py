@@ -33,6 +33,8 @@ SKIP_TOKENS = {
     "excluded",
     "!excluded",
     "stage_key",
+    "session.pipeline.completed",
+    "session.pipeline.status",
 }
 
 
