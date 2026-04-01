@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scanbox"
-version = "0.0.1"
+version = "0.1.0"
 description = "Self-contained medical document scanning, splitting, and archival pipeline"
 requires-python = ">=3.13"
 license = "MIT"
