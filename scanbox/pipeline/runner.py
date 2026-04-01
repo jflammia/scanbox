@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pikepdf
 
-from scanbox.config import config
+from scanbox.config import Config
 from scanbox.models import PipelineResult, ProcessingStage, SplitDocument
 from scanbox.pipeline.blank_detect import remove_blank_pages
 from scanbox.pipeline.interleave import interleave_pages
@@ -75,7 +75,7 @@ async def _run_blank_removal(ctx, on_progress):
         await on_progress(ProcessingStage.BLANK_REMOVAL.value, "Removing blank pages...")
     combined_path = ctx.batch_dir / "combined.pdf"
     cleaned_path = ctx.batch_dir / "cleaned.pdf"
-    result = remove_blank_pages(combined_path, cleaned_path, config.BLANK_PAGE_THRESHOLD)
+    result = remove_blank_pages(combined_path, cleaned_path, Config().BLANK_PAGE_THRESHOLD)
     removed_info = {
         "removed_indices": result.removed_indices,
         "total_pages": result.total_pages,

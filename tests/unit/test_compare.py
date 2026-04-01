@@ -177,10 +177,11 @@ class TestSplitDocumentsModelOverride:
         call_kwargs = mock_llm.call_args.kwargs
         assert call_kwargs["model"] == "custom/my-model"
 
-    @patch("scanbox.pipeline.splitter.config")
+    @patch("scanbox.pipeline.splitter.Config")
     @patch("scanbox.pipeline.splitter.litellm.acompletion")
-    async def test_no_override_uses_config(self, mock_llm, mock_config):
+    async def test_no_override_uses_config(self, mock_llm, MockConfig):
         """Without model_override, should use config.llm_model_id()."""
+        mock_config = MockConfig.return_value
         mock_config.llm_model_id.return_value = "anthropic/claude-haiku-4-5-20251001"
 
         result_json = json.dumps(

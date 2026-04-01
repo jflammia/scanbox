@@ -7,9 +7,10 @@ from scanbox.pipeline.splitter import classify_document_pages
 
 
 class TestClassifyDocumentPages:
-    @patch("scanbox.pipeline.splitter.config")
+    @patch("scanbox.pipeline.splitter.Config")
     @patch("scanbox.pipeline.splitter.litellm")
-    async def test_classifies_document(self, mock_litellm, mock_config):
+    async def test_classifies_document(self, mock_litellm, MockConfig):
+        mock_config = MockConfig.return_value
         mock_config.llm_model_id.return_value = "test-model"
         mock_response = MagicMock()
         mock_response.choices = [
@@ -37,9 +38,10 @@ class TestClassifyDocumentPages:
         assert result["facility"] == "Quest Diagnostics"
         assert result["confidence"] == 0.92
 
-    @patch("scanbox.pipeline.splitter.config")
+    @patch("scanbox.pipeline.splitter.Config")
     @patch("scanbox.pipeline.splitter.litellm")
-    async def test_defaults_on_missing_fields(self, mock_litellm, mock_config):
+    async def test_defaults_on_missing_fields(self, mock_litellm, MockConfig):
+        mock_config = MockConfig.return_value
         mock_config.llm_model_id.return_value = "test-model"
         mock_response = MagicMock()
         mock_response.choices = [MagicMock(message=MagicMock(content=json.dumps({})))]
@@ -51,9 +53,10 @@ class TestClassifyDocumentPages:
         assert result["date_of_service"] == "unknown"
         assert result["confidence"] == 0.5
 
-    @patch("scanbox.pipeline.splitter.config")
+    @patch("scanbox.pipeline.splitter.Config")
     @patch("scanbox.pipeline.splitter.litellm")
-    async def test_clamps_confidence(self, mock_litellm, mock_config):
+    async def test_clamps_confidence(self, mock_litellm, MockConfig):
+        mock_config = MockConfig.return_value
         mock_config.llm_model_id.return_value = "test-model"
         mock_response = MagicMock()
         mock_response.choices = [
