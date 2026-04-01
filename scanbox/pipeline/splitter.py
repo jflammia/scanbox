@@ -10,7 +10,7 @@ import json
 
 import litellm
 
-from scanbox.config import config
+from scanbox.config import Config
 from scanbox.models import SplitDocument
 
 
@@ -120,10 +120,11 @@ async def split_documents(
     """
     prompt = build_prompt(page_texts, person_name)
     total_pages = len(page_texts)
-    model = model_override or config.llm_model_id()
+    cfg = Config()  # Fresh instance to pick up runtime.json changes
+    model = model_override or cfg.llm_model_id()
 
     kwargs = {}
-    api_base = config.llm_api_base()
+    api_base = cfg.llm_api_base()
     if api_base:
         kwargs["api_base"] = api_base
 
@@ -192,12 +193,13 @@ async def classify_document_pages(
         lines.append("")
 
     kwargs = {}
-    api_base = config.llm_api_base()
+    cfg = Config()  # Fresh instance to pick up runtime.json changes
+    api_base = cfg.llm_api_base()
     if api_base:
         kwargs["api_base"] = api_base
 
     response = await litellm.acompletion(
-        model=config.llm_model_id(),
+        model=cfg.llm_model_id(),
         messages=[
             {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
             {"role": "user", "content": "\n".join(lines)},

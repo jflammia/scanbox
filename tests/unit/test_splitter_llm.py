@@ -99,9 +99,10 @@ class TestSplitDocuments:
         with pytest.raises(SplitValidationError, match="gap"):
             await split_documents({1: "a", 2: "b", 3: "c"}, "Test")
 
-    @patch("scanbox.pipeline.splitter.config")
+    @patch("scanbox.pipeline.splitter.Config")
     @patch("scanbox.pipeline.splitter.litellm.acompletion")
-    async def test_uses_configured_model(self, mock_llm, mock_config):
+    async def test_uses_configured_model(self, mock_llm, MockConfig):
+        mock_config = MockConfig.return_value
         mock_config.llm_model_id.return_value = "gpt-4o-mini"
 
         result_json = json.dumps(
