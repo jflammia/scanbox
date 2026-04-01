@@ -21,19 +21,76 @@ templates = Jinja2Templates(directory=str(_template_dir))
 @router.get("/")
 async def home(request: Request):
     db = get_db()
+    cfg = Config()
     persons = await db.list_persons()
     sessions = await db.list_sessions()
     setup_data = _read_setup()
 
-    # Enrich sessions with person name and latest batch id
+    # Enrich sessions with person name, batch state, and pipeline progress
+    from scanbox.pipeline.state import PipelineState
+
     persons_map = {p["id"]: p["display_name"] for p in persons}
     enriched_sessions = []
     for s in sessions:
         batches = await db.list_batches(s["id"])
         latest_batch = batches[0] if batches else None
         docs = []
+        pipeline_info = None
         if latest_batch:
             docs = await db.list_documents(latest_batch["id"])
+            # Load pipeline state for progress display
+            if latest_batch["state"] in ("processing", "paused", "error", "review", "saved"):
+                session_obj = await db.get_session(s["id"])
+                if session_obj:
+                    batch_dir = cfg.sessions_dir / s["id"] / "batches" / latest_batch["id"]
+                    state_path = batch_dir / "state.json"
+                    if state_path.exists():
+                        ps = PipelineState.load(state_path)
+                        # Find last completed stage and current stage
+                        stage_labels = {
+                            "interleaving": "Combining pages",
+                            "blank_removal": "Removing blanks",
+                            "ocr": "Reading text",
+                            "splitting": "Identifying documents",
+                            "naming": "Naming documents",
+                        }
+                        last_completed = None
+                        current_stage = None
+                        for sname in (
+                            "interleaving",
+                            "blank_removal",
+                            "ocr",
+                            "splitting",
+                            "naming",
+                        ):
+                            ss = ps.stages.get(sname)
+                            if ss and ss.status.value == "completed":
+                                last_completed = stage_labels[sname]
+                            elif ss and ss.status.value in (
+                                "running",
+                                "pending",
+                                "paused",
+                                "error",
+                            ):
+                                current_stage = {
+                                    "name": stage_labels[sname],
+                                    "status": ss.status.value,
+                                    "error": ss.error,
+                                }
+                                break
+                        completed_count = sum(
+                            1
+                            for sn in stage_labels
+                            if ps.stages.get(sn) and ps.stages[sn].status.value == "completed"
+                        )
+                        pipeline_info = {
+                            "status": ps.status,
+                            "completed": completed_count,
+                            "total": 5,
+                            "last_completed": last_completed,
+                            "current": current_stage,
+                            "dlq_count": len(ps.dlq),
+                        }
         enriched_sessions.append(
             {
                 **s,
@@ -41,10 +98,10 @@ async def home(request: Request):
                 "latest_batch_id": latest_batch["id"] if latest_batch else None,
                 "batch_state": latest_batch["state"] if latest_batch else None,
                 "document_count": len(docs),
+                "pipeline": pipeline_info,
             }
         )
 
-    cfg = Config()
     return templates.TemplateResponse(
         request,
         "home.html",

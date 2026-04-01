@@ -61,28 +61,81 @@
       {% for session in sessions %}
       {% if session.latest_batch_id %}
         {% if session.batch_state in ("scanning_fronts", "fronts_done", "scanning_backs", "backs_done") %}
-      <a href="/scan/{{ session.id }}/{{ session.latest_batch_id }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
-        {% elif session.batch_state in ("processing", "paused") %}
-      <a href="/pipeline/{{ session.latest_batch_id }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
+        {% set href = "/scan/" ~ session.id ~ "/" ~ session.latest_batch_id %}
+        {% elif session.batch_state in ("processing", "paused", "error") %}
+        {% set href = "/pipeline/" ~ session.latest_batch_id %}
         {% else %}
-      <a href="/results/{{ session.latest_batch_id }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
+        {% set href = "/results/" ~ session.latest_batch_id %}
         {% endif %}
+      <a href="{{ href }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
       {% else %}
       <div class="block bg-surface-raised border border-border rounded-lg p-4">
       {% endif %}
+        {# Row 1: Person name, date, status badge #}
         <div class="flex items-center justify-between">
           <div>
             <span class="font-semibold text-text-primary">{{ session.person_name }}</span>
             <span class="text-sm text-text-muted ml-2">{{ session.created[:10] }}</span>
           </div>
-          {% if session.batch_state in ("scanning_fronts", "fronts_done", "scanning_backs", "backs_done") %}
+          {% if session.batch_state == "error" %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-status-error">
+            <span>&#10007;</span> Error
+          </span>
+          {% elif session.batch_state == "paused" %}
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-status-warning">
+            <span>&#9888;</span> Needs attention
+          </span>
+          {% elif session.batch_state in ("scanning_fronts", "fronts_done", "scanning_backs", "backs_done") %}
           <span class="text-sm text-text-secondary">Scanning</span>
-          {% elif session.batch_state in ("processing", "paused") %}
-          <span class="text-sm text-text-secondary">Processing</span>
-          {% else %}
-          <span class="text-sm text-text-secondary">{{ session.document_count }} docs</span>
+          {% elif session.batch_state == "processing" %}
+          <span class="inline-flex items-center gap-1 text-sm text-brand-600">
+            <span class="inline-block w-3 h-3 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></span>
+            Processing
+          </span>
+          {% elif session.batch_state == "review" %}
+          <span class="text-sm text-status-success font-medium">{{ session.document_count }} docs ready</span>
+          {% elif session.batch_state == "saved" %}
+          <span class="text-sm text-text-muted">{{ session.document_count }} docs saved</span>
           {% endif %}
         </div>
+
+        {# Row 2: Pipeline progress (when available) #}
+        {% if session.pipeline %}
+        <div class="mt-2">
+          {# Progress bar #}
+          <div class="flex gap-0.5 h-1.5 rounded-full overflow-hidden bg-gray-100">
+            {% for i in range(session.pipeline.total) %}
+            <div class="flex-1 rounded-full {{ 'bg-status-success' if i < session.pipeline.completed else ('bg-status-error' if session.pipeline.status == 'error' and i == session.pipeline.completed else ('bg-status-warning' if session.pipeline.status == 'paused' and i == session.pipeline.completed else 'bg-gray-200')) }}"></div>
+            {% endfor %}
+          </div>
+          {# Stage detail #}
+          <div class="flex items-center justify-between mt-1">
+            {% if session.pipeline.last_completed %}
+            <span class="text-xs text-text-muted">Last: {{ session.pipeline.last_completed }}</span>
+            {% else %}
+            <span class="text-xs text-text-muted">Not started</span>
+            {% endif %}
+
+            {% if session.pipeline.current %}
+              {% if session.pipeline.current.status == "error" %}
+            <span class="text-xs text-status-error">Failed: {{ session.pipeline.current.name }}</span>
+              {% elif session.pipeline.current.status == "paused" %}
+            <span class="text-xs text-status-warning">Paused: {{ session.pipeline.current.name }}</span>
+              {% elif session.pipeline.current.status == "running" %}
+            <span class="text-xs text-brand-600">Running: {{ session.pipeline.current.name }}</span>
+              {% else %}
+            <span class="text-xs text-text-muted">Next: {{ session.pipeline.current.name }}</span>
+              {% endif %}
+            {% elif session.pipeline.status == "completed" %}
+            <span class="text-xs text-status-success">Complete</span>
+            {% endif %}
+
+            {% if session.pipeline.dlq_count > 0 %}
+            <span class="text-xs text-status-warning">{{ session.pipeline.dlq_count }} item{{ 's' if session.pipeline.dlq_count != 1 }} in DLQ</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
       {% if session.latest_batch_id %}
       </a>
       {% else %}
