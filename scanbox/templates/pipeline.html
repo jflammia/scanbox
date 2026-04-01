@@ -14,15 +14,23 @@
          x-init="connectSSE()">
 
   {# Header #}
-  <div>
-    <h1 class="text-3xl font-bold">Processing{{ " for " + person.display_name if person else "" }}</h1>
-    <p class="text-text-secondary mt-1">
-      Batch {{ batch.batch_num }}
-      <span x-show="status === 'completed'">&mdash; <span class="text-status-success font-medium">Complete</span></span>
-      <span x-show="status === 'paused'">&mdash; <span class="text-status-warning font-medium">Paused</span></span>
-      <span x-show="status === 'error'">&mdash; <span class="text-status-error font-medium">Error</span></span>
-      <span x-show="status === 'running'">&mdash; <span class="text-brand-600 font-medium">Running</span></span>
-    </p>
+  <div class="flex items-start justify-between">
+    <div>
+      <h1 class="text-3xl font-bold">Processing{{ " for " + person.display_name if person else "" }}</h1>
+      <p class="text-text-secondary mt-1">
+        Batch {{ batch.batch_num }}
+        <span x-show="status === 'completed'">&mdash; <span class="text-status-success font-medium">Complete</span></span>
+        <span x-show="status === 'paused'">&mdash; <span class="text-status-warning font-medium">Paused</span></span>
+        <span x-show="status === 'error'">&mdash; <span class="text-status-error font-medium">Error</span></span>
+        <span x-show="status === 'running'">&mdash; <span class="text-brand-600 font-medium">Running</span></span>
+      </p>
+    </div>
+    <button hx-delete="/api/batches/{{ batch.id }}"
+            hx-confirm="Delete this batch and all its documents? This cannot be undone."
+            hx-on::after-request="if(event.detail.successful) window.location.href='/'"
+            class="text-sm text-text-muted hover:text-status-error transition-colors">
+      Delete batch
+    </button>
   </div>
 
   {# Scan summary — what was scanned #}

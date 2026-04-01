@@ -1,8 +1,11 @@
 """Session management endpoints."""
 
+import shutil
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from scanbox.config import Config
 from scanbox.main import get_db
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -61,3 +64,21 @@ async def get_session(session_id: str):
         "person_name": person["display_name"] if person else "Unknown",
         "batches": batches,
     }
+
+
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(session_id: str):
+    """Delete a session and all its batches, documents, and files."""
+    db = get_db()
+    session = await db.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cfg = Config()
+    session_dir = cfg.sessions_dir / session_id
+    deleted = await db.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session_dir.exists():
+        shutil.rmtree(session_dir)

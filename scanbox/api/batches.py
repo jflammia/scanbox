@@ -1,6 +1,7 @@
 """Batch management and scanning trigger endpoints."""
 
 import asyncio
+import shutil
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -86,6 +87,24 @@ async def get_batch(batch_id: str):
             batch["current_stage"] = state.current_stage
             batch["dlq_count"] = len(state.dlq)
     return batch
+
+
+@router.delete("/api/batches/{batch_id}", status_code=204)
+async def delete_batch(batch_id: str):
+    """Delete a batch and all its documents and files."""
+    db = get_db()
+    batch = await db.get_batch(batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    session = await db.get_session(batch["session_id"])
+    cfg = Config()
+    batch_dir = cfg.sessions_dir / session["id"] / "batches" / batch_id
+
+    await db.delete_batch(batch_id)
+
+    if batch_dir.exists():
+        shutil.rmtree(batch_dir)
 
 
 @router.post("/api/batches/{batch_id}/skip-backs")

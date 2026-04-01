@@ -328,3 +328,25 @@ class Database:
         await self._conn.execute("DELETE FROM documents WHERE batch_id = ?", (batch_id,))
         await self._conn.commit()
         return count
+
+    async def delete_batch(self, batch_id: str) -> bool:
+        """Delete a batch and all its documents. Returns True if batch existed."""
+        batch = await self.get_batch(batch_id)
+        if not batch:
+            return False
+        await self.delete_documents_by_batch(batch_id)
+        await self._conn.execute("DELETE FROM batches WHERE id = ?", (batch_id,))
+        await self._conn.commit()
+        return True
+
+    async def delete_session(self, session_id: str) -> bool:
+        """Delete a session and all its batches/documents. Returns True if session existed."""
+        session = await self.get_session(session_id)
+        if not session:
+            return False
+        batches = await self.list_batches(session_id)
+        for batch in batches:
+            await self.delete_batch(batch["id"])
+        await self._conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        await self._conn.commit()
+        return True

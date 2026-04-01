@@ -67,36 +67,46 @@
         {% else %}
         {% set href = "/results/" ~ session.latest_batch_id %}
         {% endif %}
-      <a href="{{ href }}" class="block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
+      <a href="{{ href }}" id="session-{{ session.id }}" class="group block bg-surface-raised border border-border rounded-lg p-4 hover:border-brand-300 no-underline transition-colors">
       {% else %}
-      <div class="block bg-surface-raised border border-border rounded-lg p-4">
+      <div id="session-{{ session.id }}" class="group block bg-surface-raised border border-border rounded-lg p-4">
       {% endif %}
-        {# Row 1: Person name, date, status badge #}
+        {# Row 1: Person name, date, status badge, delete #}
         <div class="flex items-center justify-between">
           <div>
             <span class="font-semibold text-text-primary">{{ session.person_name }}</span>
             <span class="text-sm text-text-muted ml-2">{{ session.created[:10] }}</span>
           </div>
-          {% if session.batch_state == "error" %}
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-status-error">
-            <span>&#10007;</span> Error
-          </span>
-          {% elif session.batch_state == "paused" %}
-          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-status-warning">
-            <span>&#9888;</span> Needs attention
-          </span>
-          {% elif session.batch_state in ("scanning_fronts", "fronts_done", "scanning_backs", "backs_done") %}
-          <span class="text-sm text-text-secondary">Scanning</span>
-          {% elif session.batch_state == "processing" %}
-          <span class="inline-flex items-center gap-1 text-sm text-brand-600">
-            <span class="inline-block w-3 h-3 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></span>
-            Processing
-          </span>
-          {% elif session.batch_state == "review" %}
-          <span class="text-sm text-status-success font-medium">{{ session.document_count }} docs ready</span>
-          {% elif session.batch_state == "saved" %}
-          <span class="text-sm text-text-muted">{{ session.document_count }} docs saved</span>
-          {% endif %}
+          <div class="flex items-center gap-3">
+            {% if session.batch_state == "error" %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-status-error">
+              <span>&#10007;</span> Error
+            </span>
+            {% elif session.batch_state == "paused" %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-status-warning">
+              <span>&#9888;</span> Needs attention
+            </span>
+            {% elif session.batch_state in ("scanning_fronts", "fronts_done", "scanning_backs", "backs_done") %}
+            <span class="text-sm text-text-secondary">Scanning</span>
+            {% elif session.batch_state == "processing" %}
+            <span class="inline-flex items-center gap-1 text-sm text-brand-600">
+              <span class="inline-block w-3 h-3 border-2 border-brand-300 border-t-brand-600 rounded-full animate-spin"></span>
+              Processing
+            </span>
+            {% elif session.batch_state == "review" %}
+            <span class="text-sm text-status-success font-medium">{{ session.document_count }} docs ready</span>
+            {% elif session.batch_state == "saved" %}
+            <span class="text-sm text-text-muted">{{ session.document_count }} docs saved</span>
+            {% endif %}
+            <button hx-delete="/api/sessions/{{ session.id }}"
+                    hx-confirm="Delete this session and all its documents? This cannot be undone."
+                    hx-target="#session-{{ session.id }}"
+                    hx-swap="outerHTML"
+                    class="text-xs text-text-muted hover:text-status-error transition-colors opacity-0 group-hover:opacity-100"
+                    onclick="event.preventDefault(); event.stopPropagation();">
+              Delete
+            </button>
+          </div>
         </div>
 
         {# Row 2: Pipeline progress (when available) #}

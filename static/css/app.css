@@ -356,6 +356,10 @@ select, input, textarea {
 .active\:bg-red-800:active { background-color: #991b1b; }
 .active\:bg-gray-200:active { background-color: #e5e7eb; }
 
+/* Opacity */
+.opacity-0 { opacity: 0; }
+.group:hover .group-hover\:opacity-100 { opacity: 1; }
+
 /* Disabled states */
 .disabled\:opacity-50:disabled { opacity: 0.5; }
 
