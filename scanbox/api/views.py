@@ -516,7 +516,7 @@ async def settings_llm(
     llm_url: str = Form(""),
     llm_api_key: str = Form(""),
 ):
-    """Save LLM settings and test connectivity."""
+    """Save LLM settings to runtime.json."""
     cfg = Config()
     runtime_path = cfg.config_dir / "runtime.json"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
@@ -534,13 +534,34 @@ async def settings_llm(
         data["llm_api_key"] = llm_api_key.strip()
     runtime_path.write_text(json.dumps(data))
 
-    # Test connectivity
+    provider_label = llm_provider.strip() or "unknown"
+    model_label = llm_model.strip() or Config().llm_model_id()
+    return HTMLResponse(
+        '<p class="text-status-success font-medium">'
+        f"Settings saved &mdash; {provider_label} / {model_label}</p>"
+    )
+
+
+@router.post("/settings/llm/test", response_class=HTMLResponse)
+async def settings_llm_test(
+    llm_provider: str = Form(""),
+    llm_model: str = Form(""),
+    llm_url: str = Form(""),
+    llm_api_key: str = Form(""),
+):
+    """Test LLM connectivity with the provided settings (does not save)."""
     import litellm
 
-    model = llm_model.strip() or Config().llm_model_id()
-    kwargs = {}
-    if llm_provider == "ollama" and llm_url.strip():
+    provider = llm_provider.strip() or "anthropic"
+    model = llm_model.strip()
+    if not model:
+        model = Config().llm_model_id()
+
+    kwargs: dict = {}
+    if provider == "ollama" and llm_url.strip():
         kwargs["api_base"] = llm_url.strip()
+    if provider in ("anthropic", "openai") and llm_api_key.strip():
+        kwargs["api_key"] = llm_api_key.strip()
 
     try:
         await litellm.acompletion(
@@ -550,14 +571,12 @@ async def settings_llm(
             **kwargs,
         )
         return HTMLResponse(
-            '<p class="text-status-success font-medium mt-2">'
-            f"Connected to {llm_provider} ({model})</p>"
+            f'<p class="text-status-success font-medium">Connected to {provider} ({model})</p>'
         )
     except Exception as e:
         msg = str(e).split("\n")[0][:200]
         return HTMLResponse(
-            '<p class="text-status-error font-medium mt-2">'
-            f"Settings saved but connection failed: {msg}</p>"
+            f'<p class="text-status-error font-medium">Connection failed: {msg}</p>'
         )
 
 
