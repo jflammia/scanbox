@@ -7,6 +7,7 @@ validation layer ensures the LLM output is structurally correct before use.
 """
 
 import json
+import re
 
 import litellm
 
@@ -123,10 +124,14 @@ async def split_documents(
     cfg = Config()  # Fresh instance to pick up runtime.json changes
     model = model_override or cfg.llm_model_id()
 
+    cfg = Config()
     kwargs = {}
     api_base = cfg.llm_api_base()
     if api_base:
         kwargs["api_base"] = api_base
+    # Only use response_format for providers that support it (not Ollama/MLX)
+    if cfg.LLM_PROVIDER != "ollama":
+        kwargs["response_format"] = {"type": "json_object"}
 
     response = await litellm.acompletion(
         model=model,
@@ -134,9 +139,8 @@ async def split_documents(
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
         ],
-        response_format={"type": "json_object"},
         temperature=0.1,
-        max_tokens=4096,
+        max_tokens=16384,
         **kwargs,
     )
 
@@ -144,8 +148,14 @@ async def split_documents(
     if not content or not content.strip():
         raise SplitValidationError("LLM returned empty response")
 
+    # Strip markdown code blocks if present (common with Ollama models)
+    text = content.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+
     try:
-        parsed = json.loads(content)
+        parsed = json.loads(text)
     except json.JSONDecodeError as e:
         raise SplitValidationError(f"LLM returned invalid JSON: {e}") from e
 
@@ -197,6 +207,8 @@ async def classify_document_pages(
     api_base = cfg.llm_api_base()
     if api_base:
         kwargs["api_base"] = api_base
+    if cfg.LLM_PROVIDER != "ollama":
+        kwargs["response_format"] = {"type": "json_object"}
 
     response = await litellm.acompletion(
         model=cfg.llm_model_id(),
@@ -204,14 +216,17 @@ async def classify_document_pages(
             {"role": "system", "content": CLASSIFY_SYSTEM_PROMPT},
             {"role": "user", "content": "\n".join(lines)},
         ],
-        response_format={"type": "json_object"},
         temperature=0.1,
-        max_tokens=1024,
+        max_tokens=8192,
         **kwargs,
     )
 
     content = response.choices[0].message.content
-    parsed = json.loads(content)
+    text = content.strip() if content else ""
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    parsed = json.loads(text)
     return {
         "document_type": parsed.get("document_type", "Other"),
         "date_of_service": parsed.get("date_of_service", "unknown"),

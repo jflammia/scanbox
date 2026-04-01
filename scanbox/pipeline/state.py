@@ -219,7 +219,10 @@ class PipelineState:
         self.stages[stage.value].status = StageStatus.SKIPPED
 
     def resume_from(self, stage: ProcessingStage) -> None:
-        self.stages[stage.value].status = StageStatus.PENDING
+        ss = self.stages[stage.value]
+        ss.status = StageStatus.PENDING
+        ss.error = None
+        ss.pause_reason = None
 
     def add_to_dlq(self, item: DLQItem) -> None:
         item.id = f"dlq-{uuid.uuid4().hex[:8]}"
